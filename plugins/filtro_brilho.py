@@ -38,10 +38,10 @@ class FiltroBrilho(PluginBase):
         self._rotulo_valor.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout_principal.addWidget(self._rotulo_valor)
 
-        # --- Slider de brilho (-100 a +100) ---
+        # --- Slider de brilho (-255 a +255) ---
         self._slider = QSlider(Qt.Orientation.Horizontal, self)
-        self._slider.setMinimum(-100)
-        self._slider.setMaximum(100)
+        self._slider.setMinimum(-255)
+        self._slider.setMaximum(255)
         self._slider.setValue(0)
         self._slider.setTickInterval(10)
         self._slider.setTickPosition(QSlider.TickPosition.TicksBelow)
