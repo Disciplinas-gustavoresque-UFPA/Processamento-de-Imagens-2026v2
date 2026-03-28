@@ -183,6 +183,9 @@ class JanelaPrincipal(QMainWindow):
         menu_arquivo = barra.addMenu("Arquivo")
         acao_abrir = menu_arquivo.addAction("Abrir imagem…")
         acao_abrir.triggered.connect(self.abrir_imagem)
+        
+        acao_salvar = menu_arquivo.addAction("Salvar imagem…")
+        acao_salvar.triggered.connect(self.salvar_imagem)
         menu_arquivo.addSeparator()
         acao_sair = menu_arquivo.addAction("Sair")
         acao_sair.triggered.connect(self.close)
@@ -219,6 +222,29 @@ class JanelaPrincipal(QMainWindow):
         self._imagem_atual = imagem_bgr
         self._exibir_imagem(imagem_bgr)
         self.statusBar().showMessage(f"Imagem carregada: {caminho}")
+        
+    def salvar_imagem(self) -> None:
+        """Salva a imagem atual em arquivo."""
+        if self._imagem_atual is None:
+            QMessageBox.information(self, "Aviso", "Nenhuma imagem para salvar.")
+            return
+
+        caminho, _ = QFileDialog.getSaveFileName(
+            self,
+            "Salvar imagem",
+            "",
+            "PNG (*.png);;JPG (*.jpg);;BMP (*.bmp)"
+        )
+
+        if not caminho:
+            return
+
+        sucesso = cv2.imwrite(caminho, self._imagem_atual)
+
+        if sucesso:
+            self.statusBar().showMessage(f"Imagem salva em: {caminho}")
+        else:
+            QMessageBox.critical(self, "Erro", "Falha ao salvar a imagem.")
 
     def abrir_plugin(self, classe_plugin: type) -> None:
         """
