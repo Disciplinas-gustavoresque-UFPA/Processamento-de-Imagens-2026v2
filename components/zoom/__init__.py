@@ -1,4 +1,4 @@
-"""Componente de visualização com suporte a zoom e pan."""
+"""Componente de visualização com suporte a zoom e arrasto com o mouse."""
 
 from .zoom import VisualizadorImagem
 
