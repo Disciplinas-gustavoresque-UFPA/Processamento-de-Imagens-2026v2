@@ -45,6 +45,9 @@ class VisualizadorImagem(QScrollArea):
             self._pixmap_original = None
             self._label_imagem.clear()
             self._label_imagem.setText("Imagem inválida.")
+            self._label_imagem.adjustSize()
+            self.horizontalScrollBar().setValue(0)
+            self.verticalScrollBar().setValue(0)
             self._zoom = 1.0
             self.zoom_alterado.emit(self._zoom)
             return
@@ -56,7 +59,11 @@ class VisualizadorImagem(QScrollArea):
             self.ajustar_imagem_a_janela()
             return
 
-        self._atualizar_pixmap()
+        limite_superior = self._limite_zoom_superior()
+        if self._zoom > limite_superior:
+            self._definir_zoom_absoluto(limite_superior)
+        else:
+            self._atualizar_pixmap()
 
     def ajustar_imagem_a_janela(self) -> None:
         if self._pixmap_original is None:
