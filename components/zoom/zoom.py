@@ -1,4 +1,4 @@
-"""Componente de visualização com zoom no cursor e pan por arrasto."""
+"""Componente de visualização com zoom no cursor e arrasto da imagem."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QLabel, QScrollArea, QSizePolicy
 
 
 class VisualizadorImagem(QScrollArea):
-    """Widget responsável por exibir imagem com zoom e pan."""
+    """Widget responsável por exibir imagem com zoom e arrasto."""
 
     zoom_alterado = Signal(float)
 
@@ -41,6 +41,14 @@ class VisualizadorImagem(QScrollArea):
         return self._pixmap_original is not None
 
     def definir_pixmap(self, pixmap: QPixmap, resetar_zoom: bool = False) -> None:
+        if pixmap.isNull():
+            self._pixmap_original = None
+            self._label_imagem.clear()
+            self._label_imagem.setText("Imagem inválida.")
+            self._zoom = 1.0
+            self.zoom_alterado.emit(self._zoom)
+            return
+
         self._pixmap_original = pixmap
         self._label_imagem.setPixmap(self._pixmap_original)
 
@@ -56,6 +64,10 @@ class VisualizadorImagem(QScrollArea):
 
         largura_imagem = self._pixmap_original.width()
         altura_imagem = self._pixmap_original.height()
+        if largura_imagem <= 0 or altura_imagem <= 0:
+            self._definir_zoom_absoluto(1.0)
+            return
+
         largura_viewport = max(1, self.viewport().width())
         altura_viewport = max(1, self.viewport().height())
 
@@ -195,4 +207,6 @@ class VisualizadorImagem(QScrollArea):
 
         # Mantém o consumo de memória sob controle em imagens grandes.
         limite_por_area = (self._MAX_PIXELS_RENDER / pixels_base) ** 0.5
+        # Garante que 100% continue possível mesmo em imagens muito grandes.
+        limite_por_area = max(1.0, limite_por_area)
         return max(self._ZOOM_MINIMO, min(self._ZOOM_MAXIMO, limite_por_area))
