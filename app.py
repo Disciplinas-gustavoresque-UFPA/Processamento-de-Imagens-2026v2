@@ -176,7 +176,7 @@ class JanelaPrincipal(QMainWindow):
         self.setStatusBar(QStatusBar(self))
 
     def _construir_menus(self) -> None:
-        """Cria a barra de menus com Arquivo e Filtros (plugins)."""
+        """Cria a barra de menus com Arquivo, Visualizar e Filtros (plugins)."""
         barra = self.menuBar()
 
         # --- Menu Arquivo ---
@@ -189,6 +189,11 @@ class JanelaPrincipal(QMainWindow):
         menu_arquivo.addSeparator()
         acao_sair = menu_arquivo.addAction("Sair")
         acao_sair.triggered.connect(self.close)
+
+        # --- Menu Visualizar ---
+        menu_visualizar = barra.addMenu("Visualizar")
+        acao_placeholder = menu_visualizar.addAction("(sem opções por enquanto)")
+        acao_placeholder.setEnabled(False)
 
         # --- Menu Filtros (populado dinamicamente) ---
         menu_filtros = barra.addMenu("Filtros")
