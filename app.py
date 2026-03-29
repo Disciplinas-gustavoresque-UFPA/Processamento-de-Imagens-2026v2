@@ -333,8 +333,8 @@ class JanelaPrincipal(QMainWindow):
 
     def _exibir_imagem(self, imagem_bgr: np.ndarray, resetar_zoom: bool = False) -> None:
         """
-        Converte um array BGR para QPixmap e o exibe no label central,
-        preservando o zoom atual por padrão.
+        Converte um array BGR para QPixmap e delega a exibição ao
+        componente de visualização, preservando o zoom atual por padrão.
         """
         imagem_rgb = cv2.cvtColor(imagem_bgr, cv2.COLOR_BGR2RGB)
         altura, largura, canais = imagem_rgb.shape
