@@ -34,6 +34,9 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QStatusBar,
+    QTabWidget,
+    QWidget,
+    QVBoxLayout,
 )
 
 # Garante que o diretório raiz do projeto esteja no sys.path para que os
