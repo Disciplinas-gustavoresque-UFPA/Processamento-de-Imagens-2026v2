@@ -293,7 +293,30 @@ class JanelaPrincipal(QMainWindow):
             self.tabs.setCurrentIndex(indice)
 
             self.statusBar().showMessage(f"Imagem carregada: {nome_arquivo}")
+    
+    def _gerar_icone_miniatura(self, imagem_bgr: np.ndarray) -> QIcon:
+        """Converte uma imagem OpenCV para QIcon para usar na aba."""
+        imagem_rgb = cv2.cvtColor(imagem_bgr, cv2.COLOR_BGR2RGB)
+        altura, largura, canais = imagem_rgb.shape
+        qimage = QImage(imagem_rgb.data, largura, altura, canais * largura, QImage.Format.Format_RGB888)
         
+        # Cria um pixmap quadrado e escala a imagem para caber
+        pixmap = QPixmap(60, 60)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        pixmap_imagem = QPixmap.fromImage(qimage).scaled(
+            60, 60, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+        )
+        
+        # Desenha a miniatura centralizada no ícone
+        import PySide6.QtGui as QtGui
+        painter = QtGui.QPainter(pixmap)
+        x = (60 - pixmap_imagem.width()) // 2
+        y = (60 - pixmap_imagem.height()) // 2
+        painter.drawPixmap(x, y, pixmap_imagem)
+        painter.end()
+        
+        return QIcon(pixmap)
+
     def salvar_imagem(self) -> None:
         """Salva a imagem atual em arquivo."""
         if self._imagem_atual is None:
