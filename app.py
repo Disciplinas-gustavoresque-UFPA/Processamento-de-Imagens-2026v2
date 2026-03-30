@@ -22,8 +22,8 @@ import sys
 
 import cv2
 import numpy as np
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QImage, QPixmap, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -139,6 +139,62 @@ def carregar_plugins_dinamicamente(
                     lambda _checked=False, cls=classe_plugin: janela_principal.abrir_plugin(cls)
                 )
 
+# ---------------------------------------------------------------------------
+# Classes de Estado
+# ---------------------------------------------------------------------------
+
+class DocumentoImagem(QWidget):
+    """
+    Representa o estado de uma única imagem aberta no programa.
+    Encapsula o canvas, a matriz original e os backups para os plugins.
+    """
+    def __init__(self, caminho_arquivo: str, imagem_bgr: np.ndarray, parent=None):
+        super().__init__(parent)
+        self.caminho = caminho_arquivo
+        self.imagem_atual = imagem_bgr
+        self.imagem_backup = None
+
+        # Configura o layout específico desta aba
+        self.layout_interno = QVBoxLayout(self)
+        self.layout_interno.setContentsMargins(0, 0, 0, 0)
+
+        # Label onde a imagem será exibida
+        self.label_imagem = QLabel()
+        self.label_imagem.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label_imagem.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        self.label_imagem.setScaledContents(False)
+
+        # ScrollArea para permitir rolar imagens muito grandes
+        self.area_rolagem = QScrollArea()
+        self.area_rolagem.setWidget(self.label_imagem)
+        self.area_rolagem.setWidgetResizable(True)
+        self.area_rolagem.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        self.layout_interno.addWidget(self.area_rolagem)
+        
+        self.atualizar_visualizacao(self.imagem_atual)
+
+    def atualizar_visualizacao(self, imagem_bgr: np.ndarray) -> None:
+        """Converte a matriz OpenCV e desenha no QLabel do documento."""
+        imagem_rgb = cv2.cvtColor(imagem_bgr, cv2.COLOR_BGR2RGB)
+        altura, largura, canais = imagem_rgb.shape
+        bytes_por_linha = canais * largura
+        qimage = QImage(imagem_rgb.data, largura, altura, bytes_por_linha, QImage.Format.Format_RGB888)
+        pixmap = QPixmap.fromImage(qimage)
+
+        # Ajusta ao tamanho do viewport da ScrollArea
+        tamanho_disponivel = self.area_rolagem.viewport().size()
+        pixmap_escalado = pixmap.scaled(
+            tamanho_disponivel,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
+        self.label_imagem.setPixmap(pixmap_escalado)
+        
+    def resizeEvent(self, event):
+        """Garante que a imagem seja redimensionada se a janela mudar de tamanho."""
+        super().resizeEvent(event)
+        self.atualizar_visualizacao(self.imagem_atual)
 
 # ---------------------------------------------------------------------------
 # Janela Principal
