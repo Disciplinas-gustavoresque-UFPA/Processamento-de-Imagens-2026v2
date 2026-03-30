@@ -33,7 +33,13 @@ CONFIG_RANKINGS = {
     "edna": {"titulo": "👓 A Edna Moda do Código", "badge": "📐 Revisor Implacável"}
 }
 
-REGEX_BADGE = r"@(\w+)\s+ganhou\s+uma\s+badge\s+de\s+(.*)"
+# Coleta automaticamente os nomes exatos de todas as badges configuradas (ignorando as que são None)
+lista_badges = [re.escape(config["badge"]) for config in CONFIG_RANKINGS.values() if config["badge"]]
+padrao_badges = "|".join(lista_badges)
+
+# Regex Dinâmica: @nickname + (qualquer coisa ou nada) + Nome Exato da Badge
+# re.DOTALL permite que o "qualquer coisa" (.*?) inclua quebras de linha
+REGEX_BADGE = re.compile(rf"@([\w-]+).*?({padrao_badges})", re.DOTALL)
 
 def buscar_atividades_recentes():
     """Busca TODAS as Issues e PRs que tiveram alguma atividade na última semana."""
