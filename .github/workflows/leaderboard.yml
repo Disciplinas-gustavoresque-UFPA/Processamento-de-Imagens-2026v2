@@ -11,15 +11,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      # Necessário para o robô fazer commit no README
       contents: write
+      pull-requests: write # <-- Permissão explícita que faltava para abrir o PR
 
     steps:
       - name: Baixar o repositório
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # Atualizado para remover o aviso do Node
 
       - name: Configurar Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5 # Atualizado para remover o aviso do Node
         with:
           python-version: '3.10'
 
@@ -29,14 +29,11 @@ jobs:
 
       - name: Rodar o Script do Placar
         env:
-          # O GitHub fornece esse token automaticamente
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python .github/scripts/gerar_placar.py
 
-      # (As etapas anteriores de baixar o repo e rodar o Python continuam iguais)
-
       - name: Criar Pull Request com o Placar
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v6 # Atualizado para remover o aviso do Node
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "🤖 Robô do Placar: Atualizando Hall da Fama Semanal"
