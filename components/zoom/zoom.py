@@ -54,6 +54,7 @@ class VisualizadorImagem(QScrollArea):
 
         self._pixmap_original = pixmap
         self._label_imagem.setPixmap(self._pixmap_original)
+        self._label_imagem.adjustSize()
 
         if resetar_zoom:
             self.ajustar_imagem_a_janela()
