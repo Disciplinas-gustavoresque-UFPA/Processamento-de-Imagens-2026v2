@@ -85,6 +85,8 @@ class VisualizadorImagem(QScrollArea):
         self._definir_zoom_absoluto(zoom_ajustado)
 
     def resetar_zoom(self) -> None:
+        if self._pixmap_original is None:
+            return
         self._definir_zoom_absoluto(1.0)
 
     def aumentar_zoom(self) -> None:
