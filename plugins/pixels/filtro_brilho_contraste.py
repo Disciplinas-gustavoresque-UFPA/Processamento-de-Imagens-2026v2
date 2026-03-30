@@ -3,13 +3,17 @@ plugins/pixels/filtro_brilho_contraste.py
 -----------------------------------------
 Plugin de exemplo: ajuste de brilho e contraste via sliders.
 
-A transformação é feita com a fórmula linear abaixo:
+A implementação segue cinco etapas:
 
-    saida = clip(alpha * imagem + beta, 0, 255)
+1) Normalização para [0, 1]
+2) Ajuste de brilho com regra condicional
+3) Ajuste de contraste com tangente e pivô em 0.5
+4) Clipping para [0, 1]
+5) Retorno para 8 bits (0 a 255)
 
 Onde:
-* alpha controla o contraste.
-* beta controla o brilho.
+* B (brilho) está em (-1.0, 1.0)
+* C (contraste) está em (-1.0, 1.0)
 """
 
 import numpy as np
@@ -39,31 +43,29 @@ class FiltroBrilhoContraste(PluginBase):
         layout_principal = QVBoxLayout(self)
 
         # --- Rótulos informativos ---
-        self._rotulo_brilho = QLabel("Brilho: +0", self)
+        self._rotulo_brilho = QLabel("Brilho (B): +0.00", self)
         self._rotulo_brilho.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout_principal.addWidget(self._rotulo_brilho)
 
-        self._rotulo_contraste = QLabel("Contraste: 1.00x", self)
+        self._rotulo_contraste = QLabel("Contraste (C): +0.00", self)
         self._rotulo_contraste.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout_principal.addWidget(self._rotulo_contraste)
 
-        # --- Slider de brilho (-255 a +255) ---
+        # --- Slider de brilho (B em -0.99 a +0.99) ---
         self._slider_brilho = QSlider(Qt.Orientation.Horizontal, self)
-        self._slider_brilho.setMinimum(-255)
-        self._slider_brilho.setMaximum(255)
+        self._slider_brilho.setMinimum(-99)
+        self._slider_brilho.setMaximum(99)
         self._slider_brilho.setValue(0)
-        self._slider_brilho.setTickInterval(10)
+        self._slider_brilho.setTickInterval(5)
         self._slider_brilho.setTickPosition(QSlider.TickPosition.TicksBelow)
         layout_principal.addWidget(self._slider_brilho)
 
-        # --- Slider de contraste (0.20x a 3.00x) ---
-        # Escala inteira para manter um slider estável:
-        # valor_real = valor_slider / 100
+        # --- Slider de contraste (C em -0.99 a +0.99) ---
         self._slider_contraste = QSlider(Qt.Orientation.Horizontal, self)
-        self._slider_contraste.setMinimum(20)
-        self._slider_contraste.setMaximum(300)
-        self._slider_contraste.setValue(100)
-        self._slider_contraste.setTickInterval(10)
+        self._slider_contraste.setMinimum(-99)
+        self._slider_contraste.setMaximum(99)
+        self._slider_contraste.setValue(0)
+        self._slider_contraste.setTickInterval(5)
         self._slider_contraste.setTickPosition(QSlider.TickPosition.TicksBelow)
         layout_principal.addWidget(self._slider_contraste)
 
@@ -88,9 +90,19 @@ class FiltroBrilhoContraste(PluginBase):
     # Lógica de processamento
     # ------------------------------------------------------------------
 
+    def _obter_parametros_normalizados(self) -> tuple[float, float]:
+        """Lê os sliders e converte para o intervalo contínuo (-1, 1)."""
+        brilho = self._slider_brilho.value() / 100.0
+        contraste = self._slider_contraste.value() / 100.0
+        return brilho, contraste
+
+    def _calcular_slant(self, contraste: float) -> float:
+        """Calcula o fator angular do contraste com base na tangente."""
+        return float(np.tan((contraste + 1.0) * np.pi / 4.0))
+
     def processar(self, imagem: np.ndarray) -> np.ndarray:
         """
-        Aplica os ajustes de brilho e contraste à imagem.
+        Aplica os ajustes de brilho e contraste conforme especificação.
 
         Parâmetros
         ----------
@@ -100,14 +112,29 @@ class FiltroBrilhoContraste(PluginBase):
         Retorna
         -------
         np.ndarray
-            Imagem com brilho/contraste ajustados, saturada em [0, 255].
+            Imagem final em 8 bits após normalização, ajuste e clipping.
         """
-        beta = self._slider_brilho.value()
-        alpha = self._slider_contraste.value() / 100.0
+        brilho, contraste = self._obter_parametros_normalizados()
 
-        # Converte para float32 para preservar precisão no ganho linear.
-        resultado = alpha * imagem.astype(np.float32) + beta
-        resultado = np.clip(resultado, 0, 255).astype(np.uint8)
+        # 1) Normaliza os pixels de [0, 255] para [0.0, 1.0].
+        v = imagem.astype(np.float32) / 255.0
+
+        # 2) Ajuste de brilho com regra condicional.
+        b_calc = brilho / 2.0
+        if b_calc < 0.0:
+            v_luz = v * (1.0 + b_calc)
+        else:
+            v_luz = v + ((1.0 - v) * b_calc)
+
+        # 3) Ajuste de contraste ao redor do pivô central (0.5).
+        slant = self._calcular_slant(contraste)
+        v_contraste = (v_luz - 0.5) * slant + 0.5
+
+        # 4) Restringe os valores para o intervalo válido [0.0, 1.0].
+        v_final = np.clip(v_contraste, 0.0, 1.0)
+
+        # 5) Retorna para 8 bits com arredondamento para inteiro mais próximo.
+        resultado = np.rint(v_final * 255.0).astype(np.uint8)
         return resultado
 
     # ------------------------------------------------------------------
@@ -116,11 +143,10 @@ class FiltroBrilhoContraste(PluginBase):
 
     def _ao_mudar_parametro(self, _valor: int) -> None:
         """Atualiza os rótulos e emite o sinal de pré-visualização."""
-        brilho = self._slider_brilho.value()
-        contraste = self._slider_contraste.value() / 100.0
+        brilho, contraste = self._obter_parametros_normalizados()
 
-        self._rotulo_brilho.setText(f"Brilho: {brilho:+d}")
-        self._rotulo_contraste.setText(f"Contraste: {contraste:.2f}x")
+        self._rotulo_brilho.setText(f"Brilho (B): {brilho:+.2f}")
+        self._rotulo_contraste.setText(f"Contraste (C): {contraste:+.2f}")
 
         imagem_processada = self.processar(self.imagem_original)
         self.preview_requested.emit(imagem_processada)
