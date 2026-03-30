@@ -208,10 +208,6 @@ class JanelaPrincipal(QMainWindow):
         self.setWindowTitle("Studio de Processamento de Imagens")
         self.resize(900, 650)
 
-        # Estado interno
-        self._imagem_atual: np.ndarray | None = None   # BGR (OpenCV)
-        self._imagem_backup: np.ndarray | None = None  # cópia antes do plugin
-
         self._construir_interface()
         self._construir_menus()
 
@@ -220,21 +216,23 @@ class JanelaPrincipal(QMainWindow):
     # ------------------------------------------------------------------
 
     def _construir_interface(self) -> None:
-        """Cria o widget central (área de visualização da imagem)."""
-        self._label_imagem = QLabel("Abra uma imagem para começar.", self)
-        self._label_imagem.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._label_imagem.setSizePolicy(
-            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored
-        )
-        self._label_imagem.setScaledContents(False)
+        """Configura a interface baseada em um QTabWidget central."""
+        self.tabs = QTabWidget(self)
+        self.tabs.setTabsClosable(True) # Habilita o botão (X) em cada aba
+        
+        # Estilo para deixar as abas maiores (para caber a miniatura)
+        self.tabs.setIconSize(QSize(60, 60))
+        self.tabs.setStyleSheet("""
+            QTabBar::tab { height: 80px; width: 120px; padding: 5px; }
+            QTabWidget::pane { border-top: 2px solid #C2C7CB; }
+        """)
 
-        area_rolagem = QScrollArea(self)
-        area_rolagem.setWidget(self._label_imagem)
-        area_rolagem.setWidgetResizable(True)
-        area_rolagem.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setCentralWidget(area_rolagem)
-
+        # Conecta o sinal de clique no botão de fechar da aba à função de validação
+        self.tabs.tabCloseRequested.connect(self._solicitar_fechamento_aba)
+        
+        self.setCentralWidget(self.tabs)
         self.setStatusBar(QStatusBar(self))
+        self._atualizar_status_vazio()
 
     def _construir_menus(self) -> None:
         """Cria a barra de menus com Arquivo e Filtros (plugins)."""
@@ -265,24 +263,36 @@ class JanelaPrincipal(QMainWindow):
     # ------------------------------------------------------------------
 
     def abrir_imagem(self) -> None:
-        """Abre um diálogo de arquivo e carrega a imagem selecionada."""
-        caminho, _ = QFileDialog.getOpenFileName(
+        """Abre a imagem, cria um novo DocumentoImagem e adiciona como aba com miniatura."""
+        caminhos, _ = QFileDialog.getOpenFileNames(
             self,
             "Abrir Imagem",
             "",
             "Imagens (*.png *.jpg *.jpeg *.bmp *.tiff *.tif)",
         )
-        if not caminho:
+        if not caminhos:
             return
 
-        imagem_bgr = cv2.imread(caminho)
-        if imagem_bgr is None:
-            QMessageBox.critical(self, "Erro", f"Não foi possível abrir:\n{caminho}")
-            return
+        for caminho in caminhos:
+            imagem_bgr = cv2.imread(caminho)
+            if imagem_bgr is None:
+                QMessageBox.critical(self, "Erro", f"Não foi possível abrir:\n{caminho}")
+                continue
 
-        self._imagem_atual = imagem_bgr
-        self._exibir_imagem(imagem_bgr)
-        self.statusBar().showMessage(f"Imagem carregada: {caminho}")
+             # Instancia o documento e adiciona à UI
+            novo_documento = DocumentoImagem(caminho, imagem_bgr)
+            
+            # Gera a miniatura (Icon) para a aba
+            miniatura_icon = self._gerar_icone_miniatura(imagem_bgr)
+            
+            # Pega só o nome do arquivo para colocar na aba (Ex: foto.jpg)
+            nome_arquivo = os.path.basename(caminho)
+            
+            # Adiciona a aba com o ícone (miniatura) e o título
+            indice = self.tabs.addTab(novo_documento, miniatura_icon, nome_arquivo)
+            self.tabs.setCurrentIndex(indice)
+
+            self.statusBar().showMessage(f"Imagem carregada: {nome_arquivo}")
         
     def salvar_imagem(self) -> None:
         """Salva a imagem atual em arquivo."""
