@@ -5,7 +5,9 @@ Janela Principal do Studio de Processamento de Imagens.
 
 Funcionalidades
 ---------------
-* Abrir imagens (PNG, JPG, BMP, TIFF).
+* Abrir e fechar imagens (PNG, JPG, BMP, TIFF).
+* Suporte a abertura a múltiplas imagens via abas
+* Barra superior com abas exibindo miniaturas das imagens.
 * Exibir a imagem em um QLabel centralizado com redimensionamento automático.
 * Carregar plugins dinamicamente a partir da pasta ``plugins/``, construindo
   uma hierarquia de submenus que espelha a estrutura de diretórios.
