@@ -323,7 +323,8 @@ class JanelaPrincipal(QMainWindow):
 
     def _ao_zoom_alterado(self, zoom: float) -> None:
         """Atualiza a barra de status com o nível de zoom atual."""
-        self.statusBar().showMessage(f"Zoom: {int(zoom * 100)}%")
+        nivel_zoom = round(zoom * 100)
+        self.statusBar().showMessage(f"Zoom: {nivel_zoom:.0f}%")
 
     def keyPressEvent(self, evento) -> None:
         if evento.key() == Qt.Key.Key_Space and not evento.isAutoRepeat():
