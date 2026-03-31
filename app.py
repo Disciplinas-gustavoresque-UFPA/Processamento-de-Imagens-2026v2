@@ -221,9 +221,10 @@ class JanelaPrincipal(QMainWindow):
         self.tabs.setTabsClosable(True) # Habilita o botão (X) em cada aba
         
         # Estilo para deixar as abas maiores (para caber a miniatura)
-        self.tabs.setIconSize(QSize(60, 60))
+        self.tabs.setIconSize(QSize(40, 40))
         self.tabs.setStyleSheet("""
-            QTabBar::tab { height: 80px; width: 120px; padding: 5px; }
+            QTabBar { alignment: left; }
+            QTabBar::tab { height: 80px; width: 140px; padding: 5px; font-weight: bold; text-align: left; }
             QTabWidget::pane { border-top: 2px solid #C2C7CB; }
         """)
 
