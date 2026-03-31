@@ -406,59 +406,31 @@ class JanelaPrincipal(QMainWindow):
     # Slots privados
     # ------------------------------------------------------------------
 
-    def _ao_fechar_plugin(self, codigo: int) -> None:
+    def _ao_fechar_plugin(self, codigo: int, aba: DocumentoImagem) -> None:
         """Restaura o backup se o diálogo foi fechado sem confirmar."""
         from PySide6.QtWidgets import QDialog
-        if codigo != QDialog.DialogCode.Accepted:
-            self._restaurar_backup()
+        if codigo != QDialog.DialogCode.Accepted and aba.imagem_backup is not None:
+            aba.imagem_atual = aba.imagem_backup
+            aba.atualizar_visualizacao(aba.imagem_atual)
+            aba.imagem_backup = None
 
-    def _ao_receber_preview(self, imagem_rgb: np.ndarray) -> None:
+    def _ao_receber_preview(self, imagem_rgb: np.ndarray, aba: DocumentoImagem) -> None:
         """Exibe a pré-visualização sem alterar a imagem de trabalho."""
         imagem_bgr = cv2.cvtColor(imagem_rgb, cv2.COLOR_RGB2BGR)
-        self._exibir_imagem(imagem_bgr)
+        aba.atualizar_visualizacao(imagem_bgr)
 
-    def _ao_aplicar_plugin(self, imagem_rgb: np.ndarray) -> None:
-        """Substitui a imagem de trabalho pela imagem processada."""
-        self._imagem_atual = cv2.cvtColor(imagem_rgb, cv2.COLOR_RGB2BGR)
-        self._imagem_backup = None
+    def _ao_aplicar_plugin(self, imagem_rgb: np.ndarray, aba: DocumentoImagem) -> None:
+        """Substitui a imagem de trabalho pela imagem processada e atualiza a miniatura da aba."""
+        imagem_bgr = cv2.cvtColor(imagem_rgb, cv2.COLOR_RGB2BGR)
+        aba.imagem_atual = imagem_bgr
+        aba.imagem_backup = None
+        
+        # Atualiza a aba com a nova miniatura
+        indice_aba = self.tabs.indexOf(aba)
+        if indice_aba != -1:
+            self.tabs.setTabIcon(indice_aba, self._gerar_icone_miniatura(imagem_bgr))
+            
         self.statusBar().showMessage("Filtro aplicado com sucesso.")
-
-    def _restaurar_backup(self) -> None:
-        """Restaura a imagem ao estado anterior à abertura do plugin."""
-        if self._imagem_backup is not None:
-            self._imagem_atual = self._imagem_backup
-            self._exibir_imagem(self._imagem_atual)
-            self._imagem_backup = None
-
-    # ------------------------------------------------------------------
-    # Utilitários de exibição
-    # ------------------------------------------------------------------
-
-    def _exibir_imagem(self, imagem_bgr: np.ndarray) -> None:
-        """
-        Converte um array BGR para QPixmap e o exibe no label central,
-        ajustando o tamanho para caber na área disponível.
-        """
-        imagem_rgb = cv2.cvtColor(imagem_bgr, cv2.COLOR_BGR2RGB)
-        altura, largura, canais = imagem_rgb.shape
-        bytes_por_linha = canais * largura
-        qimage = QImage(
-            imagem_rgb.data,
-            largura,
-            altura,
-            bytes_por_linha,
-            QImage.Format.Format_RGB888,
-        )
-        pixmap = QPixmap.fromImage(qimage)
-
-        # Redimensiona mantendo a proporção para caber no label
-        pixmap_escalado = pixmap.scaled(
-            self._label_imagem.size(),
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-        self._label_imagem.setPixmap(pixmap_escalado)
-
 
 # ---------------------------------------------------------------------------
 # Ponto de entrada
