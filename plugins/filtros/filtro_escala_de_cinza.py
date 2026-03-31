@@ -25,6 +25,7 @@ class FiltroEscalaDeCinza(PluginBase):
         self._radios_metodo: dict[str, QRadioButton] = {}
 
         opcoes = [
+            ("Sem Filtro", "sem_filtro"),
             ("Média RGB", "media"),
             ("Canal R", "r"),
             ("Canal G", "g"),
@@ -39,19 +40,15 @@ class FiltroEscalaDeCinza(PluginBase):
             self._radios_metodo[valor] = radio
             layout_principal.addWidget(radio)
 
-        self._radios_metodo["media"].setChecked(True)
+        self._radios_metodo["sem_filtro"].setChecked(True)
 
-        self._rotulo_metodo_atual = QLabel("Conversão atual: Média RGB", self)
+        self._rotulo_metodo_atual = QLabel("Conversão atual: Sem Filtro", self)
         self._rotulo_metodo_atual.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout_principal.addWidget(self._rotulo_metodo_atual)
 
         layout_botoes = QHBoxLayout()
         self._btn_aplicar = QPushButton("Aplicar", self)
         self._btn_cancelar = QPushButton("Cancelar", self)
-        self._btn_aplicar.setAutoDefault(False)
-        self._btn_aplicar.setDefault(False)
-        self._btn_cancelar.setAutoDefault(False)
-        self._btn_cancelar.setDefault(False)
         layout_botoes.addWidget(self._btn_aplicar)
         layout_botoes.addWidget(self._btn_cancelar)
         layout_principal.addLayout(layout_botoes)
@@ -71,7 +68,7 @@ class FiltroEscalaDeCinza(PluginBase):
         for valor, radio in self._radios_metodo.items():
             if radio.isChecked():
                 return valor
-        return "media"
+        return "sem_filtro"
 
     def processar(self, imagem: np.ndarray) -> np.ndarray:
         imagem_float = imagem.astype(np.float32)
@@ -81,18 +78,21 @@ class FiltroEscalaDeCinza(PluginBase):
         g = imagem_float[..., 1]
         b = imagem_float[..., 2]
 
+        maxc = np.maximum.reduce([r, g, b])
+        minc = np.minimum.reduce([r, g, b])
+
+        if metodo == "sem_filtro":
+            return imagem.copy()
         if metodo == "r":
             cinza = r
         elif metodo == "g":
             cinza = g
         elif metodo == "b":
             cinza = b
-        elif metodo == "media":
-            cinza = (r + g + b) / 3.0
         elif metodo == "hsl_l":
-            cinza = (np.maximum.reduce([r, g, b]) + np.minimum.reduce([r, g, b])) / 2.0
+            cinza = (maxc + minc) / 2.0
         elif metodo == "hsb_b":
-            cinza = np.maximum.reduce([r, g, b])
+            cinza = maxc
         else:
             cinza = (r + g + b) / 3.0
 
