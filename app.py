@@ -317,6 +317,29 @@ class JanelaPrincipal(QMainWindow):
         
         return QIcon(pixmap)
 
+    def _solicitar_fechamento_aba(self, indice: int) -> None:
+        """Dispara o alerta de fechamento. Se o usuário confirmar, fecha a aba."""
+        if indice < 0:
+            return
+            
+        aba = self.tabs.widget(indice)
+        nome_arquivo = os.path.basename(aba.caminho)
+
+        resposta = QMessageBox.warning(
+            self,
+            "Aviso de Fechamento",
+            f"Deseja realmente fechar o arquivo '{nome_arquivo}'?\n\nQualquer modificação não salva será perdida.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel
+        )
+
+        if resposta == QMessageBox.StandardButton.Yes:
+            self.tabs.removeTab(indice)
+            aba.deleteLater() # Libera memória
+            self.statusBar().showMessage(f"Arquivo '{nome_arquivo}' fechado.")
+            if self.tabs.count() == 0:
+                self._atualizar_status_vazio()
+
     def salvar_imagem(self) -> None:
         """Salva a imagem atual em arquivo."""
         if self._imagem_atual is None:
