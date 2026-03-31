@@ -341,53 +341,64 @@ class JanelaPrincipal(QMainWindow):
                 self._atualizar_status_vazio()
 
     def salvar_imagem(self) -> None:
-        """Salva a imagem atual em arquivo."""
-        if self._imagem_atual is None:
+        """Salva a imagem da aba atual em arquivo."""
+        aba_atual = self.tabs.currentWidget()
+        if not aba_atual:
             QMessageBox.information(self, "Aviso", "Nenhuma imagem para salvar.")
             return
 
         caminho, _ = QFileDialog.getSaveFileName(
             self,
             "Salvar imagem",
-            "",
+            aba_atual.caminho,
             "PNG (*.png);;JPG (*.jpg);;BMP (*.bmp)"
         )
 
         if not caminho:
             return
 
-        sucesso = cv2.imwrite(caminho, self._imagem_atual)
+        sucesso = cv2.imwrite(caminho, aba_atual.imagem_atual)
 
         if sucesso:
             self.statusBar().showMessage(f"Imagem salva em: {caminho}")
+            # Atualiza a miniatura caso o usuário tenha salvo após aplicar um filtro
+            self.tabs.setTabIcon(self.tabs.currentIndex(), self._gerar_icone_miniatura(aba_atual.imagem_atual))
         else:
             QMessageBox.critical(self, "Erro", "Falha ao salvar a imagem.")
 
+    def _atualizar_status_vazio(self):
+        self.statusBar().showMessage("Pronto. Abra uma imagem no menu Arquivo.")
+
+    # ------------------------------------------------------------------
+    # Integração com Plugins
+    # ------------------------------------------------------------------
+
     def abrir_plugin(self, classe_plugin: type) -> None:
         """
-        Instancia e exibe o diálogo do plugin, conectando seus sinais.
+        Instancia e exibe o diálogo do plugin para a imagem atual, conectando seus sinais.
 
         Parâmetros
         ----------
         classe_plugin : type
             Classe do plugin a ser instanciado (subclasse de ``PluginBase``).
         """
-        if self._imagem_atual is None:
+        aba_atual = self.tabs.currentWidget()
+        if not aba_atual:
             QMessageBox.information(
                 self, "Aviso", "Abra uma imagem antes de aplicar um filtro."
             )
             return
 
         # Converte BGR → RGB antes de enviar ao plugin
-        imagem_rgb = cv2.cvtColor(self._imagem_atual, cv2.COLOR_BGR2RGB)
-        self._imagem_backup = self._imagem_atual.copy()
+        imagem_rgb = cv2.cvtColor(aba_atual.imagem_atual, cv2.COLOR_BGR2RGB)
+        aba_atual.imagem_backup = aba_atual.imagem_atual.copy()
 
         dialogo = classe_plugin(imagem_rgb, self)
-        dialogo.preview_requested.connect(self._ao_receber_preview)
-        dialogo.apply_requested.connect(self._ao_aplicar_plugin)
+        dialogo.preview_requested.connect(lambda rgb: self._ao_receber_preview(rgb, aba_atual))
+        dialogo.apply_requested.connect(lambda rgb: self._ao_aplicar_plugin(rgb, aba_atual))
 
         # Se o usuário fechar sem aplicar, restaura a imagem original
-        dialogo.finished.connect(self._ao_fechar_plugin)
+        dialogo.finished.connect(lambda codigo: self._ao_fechar_plugin(codigo, aba_atual))
 
         dialogo.exec()
 
