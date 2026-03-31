@@ -25,6 +25,8 @@ class FiltroEscalaDeCinza(PluginBase):
         self._combo_metodo.addItem("Canal G", "g")
         self._combo_metodo.addItem("Canal B", "b")
         self._combo_metodo.addItem("Media RGB", "media")
+        self._combo_metodo.addItem("L do HSL", "hsl_l")
+        self._combo_metodo.addItem("B do HSB", "hsb_b")
         layout_principal.addWidget(self._combo_metodo)
 
         self._rotulo_metodo_atual = QLabel("Conversao atual: Canal R", self)
@@ -62,6 +64,12 @@ class FiltroEscalaDeCinza(PluginBase):
             cinza = g
         elif metodo == "b":
             cinza = b
+        elif metodo == "media":
+            cinza = (r + g + b) / 3.0
+        elif metodo == "hsl_l":
+            cinza = (np.maximum.reduce([r, g, b]) + np.minimum.reduce([r, g, b])) / 2.0
+        elif metodo == "hsb_b":
+            cinza = np.maximum.reduce([r, g, b])
         else:
             cinza = (r + g + b) / 3.0
 
