@@ -7,10 +7,11 @@ Funcionalidades
 ---------------
 * Abrir imagens (PNG, JPG, BMP, TIFF).
 * Exibir a imagem em um QLabel centralizado com redimensionamento automático.
-* Carregar plugins dinamicamente a partir da pasta ``plugins/``, construindo
-  uma hierarquia de submenus que espelha a estrutura de diretórios.
+* Carregar plugins dinamicamente em dois grupos de menu:
+    - ``Pixels`` para operações pontuais (ex.: brilho/contraste).
+    - ``Filtros`` para operações regionais.
 * Pré-visualizar e aplicar filtros via os sinais ``preview_requested`` e
-  ``apply_requested`` definidos em ``PluginBase``.
+    ``apply_requested`` definidos em ``PluginBase``.
 """
 
 import importlib.util
@@ -176,7 +177,7 @@ class JanelaPrincipal(QMainWindow):
         self.setStatusBar(QStatusBar(self))
 
     def _construir_menus(self) -> None:
-        """Cria a barra de menus com Arquivo e Filtros (plugins)."""
+        """Cria a barra de menus com Arquivo, Pixels e Filtros."""
         barra = self.menuBar()
 
         # --- Menu Arquivo ---
@@ -190,10 +191,19 @@ class JanelaPrincipal(QMainWindow):
         acao_sair = menu_arquivo.addAction("Sair")
         acao_sair.triggered.connect(self.close)
 
-        # --- Menu Filtros (populado dinamicamente) ---
+        # --- Menu Pixels (operações pontuais) ---
+        menu_pixels = barra.addMenu("Pixels")
+        diretorio_pixels = os.path.join(_DIRETORIO_RAIZ, "plugins", "pixels")
+        carregar_plugins_dinamicamente(menu_pixels, diretorio_pixels, self)
+
+        if not menu_pixels.actions():
+            aviso = menu_pixels.addAction("(nenhum plugin encontrado)")
+            aviso.setEnabled(False)
+
+        # --- Menu Filtros (operações regionais) ---
         menu_filtros = barra.addMenu("Filtros")
-        diretorio_plugins = os.path.join(_DIRETORIO_RAIZ, "plugins")
-        carregar_plugins_dinamicamente(menu_filtros, diretorio_plugins, self)
+        diretorio_filtros = os.path.join(_DIRETORIO_RAIZ, "plugins", "filtros")
+        carregar_plugins_dinamicamente(menu_filtros, diretorio_filtros, self)
 
         if not menu_filtros.actions():
             aviso = menu_filtros.addAction("(nenhum plugin encontrado)")
