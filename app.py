@@ -26,6 +26,7 @@ from PySide6.QtGui import QImage, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
+    QLabel,
     QMainWindow,
     QMenu,
     QMessageBox,
@@ -163,6 +164,8 @@ class JanelaPrincipal(QMainWindow):
         self.setCentralWidget(self._visualizador)
 
         self.setStatusBar(QStatusBar(self))
+        self._label_zoom_status = QLabel("Zoom: 100%", self)
+        self.statusBar().addPermanentWidget(self._label_zoom_status)
 
     def _construir_menus(self) -> None:
         """Cria a barra de menus com Arquivo, Visualizar, Pixels e Filtros (plugins)."""
@@ -238,7 +241,7 @@ class JanelaPrincipal(QMainWindow):
             return
 
         self._imagem_atual = imagem_bgr
-        self._exibir_imagem(imagem_bgr, resetar_zoom=True)
+        self._exibir_imagem(imagem_bgr, ajustar_a_janela=True)
         self.statusBar().showMessage(f"Imagem carregada: {caminho}")
         
     def salvar_imagem(self) -> None:
@@ -321,9 +324,9 @@ class JanelaPrincipal(QMainWindow):
             self._imagem_backup = None
 
     def _ao_zoom_alterado(self, zoom: float) -> None:
-        """Atualiza a barra de status com o nível de zoom atual."""
+        """Atualiza o indicador permanente com o nível de zoom atual."""
         nivel_zoom = round(zoom * 100)
-        self.statusBar().showMessage(f"Zoom: {nivel_zoom:.0f}%")
+        self._label_zoom_status.setText(f"Zoom: {nivel_zoom:.0f}%")
 
     def keyPressEvent(self, evento) -> None:
         if evento.key() == Qt.Key.Key_Space and not evento.isAutoRepeat():
@@ -343,7 +346,7 @@ class JanelaPrincipal(QMainWindow):
     # Utilitários de exibição
     # ------------------------------------------------------------------
 
-    def _exibir_imagem(self, imagem_bgr: np.ndarray, resetar_zoom: bool = False) -> None:
+    def _exibir_imagem(self, imagem_bgr: np.ndarray, ajustar_a_janela: bool = False) -> None:
         """
         Converte um array BGR para QPixmap e delega a exibição ao
         componente de visualização, preservando o zoom atual por padrão.
@@ -359,7 +362,7 @@ class JanelaPrincipal(QMainWindow):
             QImage.Format.Format_RGB888,
         )
         pixmap = QPixmap.fromImage(qimage)
-        self._visualizador.definir_pixmap(pixmap, resetar_zoom=resetar_zoom)
+        self._visualizador.definir_pixmap(pixmap, ajustar_a_janela=ajustar_a_janela)
 
 
 # ---------------------------------------------------------------------------
