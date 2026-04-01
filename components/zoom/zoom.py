@@ -167,6 +167,7 @@ class VisualizadorImagem(QScrollArea):
     def _definir_zoom_absoluto(self, zoom: float) -> None:
         novo_zoom = max(self._ZOOM_MINIMO, min(self._limite_zoom_superior(), zoom))
         if abs(novo_zoom - self._zoom) < 1e-6:
+            self._atualizar_pixmap()
             return
 
         self._zoom = novo_zoom
