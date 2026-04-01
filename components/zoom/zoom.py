@@ -217,6 +217,7 @@ class VisualizadorImagem(QScrollArea):
 
         # Mantém o consumo de memória sob controle em imagens grandes.
         limite_por_area = (self._MAX_PIXELS_RENDER / pixels_base) ** 0.5
-        # Garante que 100% continue possível mesmo em imagens muito grandes.
-        limite_por_area = max(1.0, limite_por_area)
+        # Para imagens que já cabem no teto, mantém 100% sempre possível.
+        if pixels_base <= self._MAX_PIXELS_RENDER:
+            limite_por_area = max(1.0, limite_por_area)
         return max(self._ZOOM_MINIMO, min(self._ZOOM_MAXIMO, limite_por_area))
