@@ -43,6 +43,7 @@ class VisualizadorImagem(QScrollArea):
     def definir_pixmap(self, pixmap: QPixmap, ajustar_a_janela: bool = False) -> None:
         if pixmap.isNull():
             self._pixmap_original = None
+            self._label_imagem.setPixmap(QPixmap())
             self._label_imagem.clear()
             self._label_imagem.setText("Imagem inválida.")
             self._label_imagem.adjustSize()
@@ -53,6 +54,7 @@ class VisualizadorImagem(QScrollArea):
             return
 
         self._pixmap_original = pixmap
+        self._label_imagem.setText("")
         self._label_imagem.setPixmap(self._pixmap_original)
         self._label_imagem.adjustSize()
 
