@@ -40,7 +40,7 @@ class VisualizadorImagem(QScrollArea):
     def possui_imagem(self) -> bool:
         return self._pixmap_original is not None
 
-    def definir_pixmap(self, pixmap: QPixmap, resetar_zoom: bool = False) -> None:
+    def definir_pixmap(self, pixmap: QPixmap, ajustar_a_janela: bool = False) -> None:
         if pixmap.isNull():
             self._pixmap_original = None
             self._label_imagem.clear()
@@ -56,7 +56,7 @@ class VisualizadorImagem(QScrollArea):
         self._label_imagem.setPixmap(self._pixmap_original)
         self._label_imagem.adjustSize()
 
-        if resetar_zoom:
+        if ajustar_a_janela:
             self.ajustar_imagem_a_janela()
             return
 
@@ -81,7 +81,8 @@ class VisualizadorImagem(QScrollArea):
 
         fator_largura = largura_viewport / largura_imagem
         fator_altura = altura_viewport / altura_imagem
-        zoom_ajustado = min(fator_largura, fator_altura, 1.0)
+        limite_superior = self._limite_zoom_superior()
+        zoom_ajustado = min(fator_largura, fator_altura, limite_superior)
 
         self._definir_zoom_absoluto(zoom_ajustado)
 
