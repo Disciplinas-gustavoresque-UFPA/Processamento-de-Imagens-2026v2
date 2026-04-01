@@ -165,8 +165,7 @@ class JanelaPrincipal(QMainWindow):
         self.setStatusBar(QStatusBar(self))
 
     def _construir_menus(self) -> None:
-        """Cria a barra de menus com Arquivo, Visualizar e Filtros (plugins)."""
-        """Cria a barra de menus com Arquivo, Pixels e Filtros."""
+        """Cria a barra de menus com Arquivo, Visualizar, Pixels e Filtros (plugins)."""
         barra = self.menuBar()
 
         # --- Menu Arquivo ---
@@ -199,7 +198,7 @@ class JanelaPrincipal(QMainWindow):
         acao_zoom_100.setShortcut("Ctrl+0")
         acao_zoom_100.triggered.connect(self._visualizador.resetar_zoom)
 
-        # --- Menu Filtros (populado dinamicamente) ---
+        # --- Menus de plugins (populados dinamicamente) ---
         # --- Menu Pixels (operações pontuais) ---
         menu_pixels = barra.addMenu("Pixels")
         diretorio_pixels = os.path.join(_DIRETORIO_RAIZ, "plugins", "pixels")
