@@ -192,6 +192,15 @@ class JanelaPrincipal(QMainWindow):
         acao_sair.triggered.connect(self.close)
 
         # --- Menu Pixels (operações pontuais) ---
+        menu_analise = barra.addMenu("Analise")
+        diretorio_pixels = os.path.join(_DIRETORIO_RAIZ, "plugins", "analise")
+        carregar_plugins_dinamicamente(menu_analise, diretorio_pixels, self)
+
+        if not menu_analise.actions():
+            aviso = menu_analise.addAction("(nenhum plugin encontrado)")
+            aviso.setEnabled(False)
+            
+        # --- Menu Pixels (operações pontuais) ---
         menu_pixels = barra.addMenu("Pixels")
         diretorio_pixels = os.path.join(_DIRETORIO_RAIZ, "plugins", "pixels")
         carregar_plugins_dinamicamente(menu_pixels, diretorio_pixels, self)
