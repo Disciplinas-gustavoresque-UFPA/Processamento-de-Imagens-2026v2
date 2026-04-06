@@ -7,11 +7,11 @@ Funcionalidades
 ---------------
 * Abrir imagens (PNG, JPG, BMP, TIFF).
 * Exibir a imagem em um QLabel centralizado com redimensionamento automático.
-* Carregar plugins dinamicamente em dois grupos de menu:
+* Carregar plugins dinamicamente em três grupos de menu:
     - ``Pixels`` para operações pontuais (ex.: brilho/contraste).
     - ``Imagem`` para transformações geométricas e ajustes globais.
     - ``Filtros`` para operações regionais.
-* Pré-visualizar e aplicar filtros via os sinais ``preview_requested`` e
+* Pré-visualizar e aplicar plugins via os sinais ``preview_requested`` e
     ``apply_requested`` definidos em ``PluginBase``.
 """
 
