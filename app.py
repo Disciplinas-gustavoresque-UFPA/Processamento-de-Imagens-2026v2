@@ -9,6 +9,7 @@ Funcionalidades
 * Exibir a imagem em um QLabel centralizado com redimensionamento automático.
 * Carregar plugins dinamicamente em dois grupos de menu:
     - ``Pixels`` para operações pontuais (ex.: brilho/contraste).
+    - ``Imagem`` para transformações geométricas e ajustes globais.
     - ``Filtros`` para operações regionais.
 * Pré-visualizar e aplicar filtros via os sinais ``preview_requested`` e
     ``apply_requested`` definidos em ``PluginBase``.
@@ -82,6 +83,11 @@ def _carregar_classes_do_arquivo(caminho_arquivo: str) -> list[type]:
     return classes
 
 
+def _formatar_nome_menu(nome_pasta: str) -> str:
+    """Converte nome de pasta em rótulo amigável para submenu."""
+    return nome_pasta.replace("_", " ").title()
+
+
 def carregar_plugins_dinamicamente(
     menu_pai: QMenu,
     diretorio: str,
@@ -112,7 +118,7 @@ def carregar_plugins_dinamicamente(
     for entrada in entradas:
         caminho = os.path.join(diretorio, entrada)
         if os.path.isdir(caminho) and not entrada.startswith("_"):
-            submenu = QMenu(entrada, menu_pai)
+            submenu = QMenu(_formatar_nome_menu(entrada), menu_pai)
             menu_pai.addMenu(submenu)
             carregar_plugins_dinamicamente(submenu, caminho, janela_principal)
 
@@ -177,7 +183,7 @@ class JanelaPrincipal(QMainWindow):
         self.setStatusBar(QStatusBar(self))
 
     def _construir_menus(self) -> None:
-        """Cria a barra de menus com Arquivo, Pixels e Filtros."""
+        """Cria a barra de menus com Arquivo, Pixels, Imagem e Filtros."""
         barra = self.menuBar()
 
         # --- Menu Arquivo ---
@@ -198,6 +204,15 @@ class JanelaPrincipal(QMainWindow):
 
         if not menu_pixels.actions():
             aviso = menu_pixels.addAction("(nenhum plugin encontrado)")
+            aviso.setEnabled(False)
+
+        # --- Menu Imagem (transformações e ajustes globais) ---
+        menu_imagem = barra.addMenu("Imagem")
+        diretorio_imagem = os.path.join(_DIRETORIO_RAIZ, "plugins", "imagem")
+        carregar_plugins_dinamicamente(menu_imagem, diretorio_imagem, self)
+
+        if not menu_imagem.actions():
+            aviso = menu_imagem.addAction("(nenhum plugin encontrado)")
             aviso.setEnabled(False)
 
         # --- Menu Filtros (operações regionais) ---
