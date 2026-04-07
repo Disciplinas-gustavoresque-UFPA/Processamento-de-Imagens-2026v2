@@ -84,8 +84,8 @@ def _carregar_classes_do_arquivo(caminho_arquivo: str) -> list[type]:
 
 
 def _formatar_nome_menu(nome_pasta: str) -> str:
-    """Converte nome de pasta em rótulo amigável para submenu."""
-    return nome_pasta.replace("_", " ").title()
+    """Retorna o nome da pasta sem alterações para uso no submenu."""
+    return nome_pasta
 
 
 def carregar_plugins_dinamicamente(
@@ -140,6 +140,21 @@ def carregar_plugins_dinamicamente(
                 acao.triggered.connect(
                     lambda _checked=False, cls=classe_plugin: janela_principal.abrir_plugin(cls)
                 )
+
+
+def _menu_tem_acao_folha(menu: QMenu) -> bool:
+    """
+    Retorna ``True`` quando há ao menos uma ação de plugin no menu.
+
+    Ações que abrem submenus não contam; apenas ações "folha".
+    """
+    for acao in menu.actions():
+        submenu = acao.menu()
+        if submenu is None:
+            return True
+        if _menu_tem_acao_folha(submenu):
+            return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -202,7 +217,7 @@ class JanelaPrincipal(QMainWindow):
         diretorio_pixels = os.path.join(_DIRETORIO_RAIZ, "plugins", "pixels")
         carregar_plugins_dinamicamente(menu_pixels, diretorio_pixels, self)
 
-        if not menu_pixels.actions():
+        if not _menu_tem_acao_folha(menu_pixels):
             aviso = menu_pixels.addAction("(nenhum plugin encontrado)")
             aviso.setEnabled(False)
 
@@ -211,7 +226,7 @@ class JanelaPrincipal(QMainWindow):
         diretorio_imagem = os.path.join(_DIRETORIO_RAIZ, "plugins", "imagem")
         carregar_plugins_dinamicamente(menu_imagem, diretorio_imagem, self)
 
-        if not menu_imagem.actions():
+        if not _menu_tem_acao_folha(menu_imagem):
             aviso = menu_imagem.addAction("(nenhum plugin encontrado)")
             aviso.setEnabled(False)
 
@@ -220,7 +235,7 @@ class JanelaPrincipal(QMainWindow):
         diretorio_filtros = os.path.join(_DIRETORIO_RAIZ, "plugins", "filtros")
         carregar_plugins_dinamicamente(menu_filtros, diretorio_filtros, self)
 
-        if not menu_filtros.actions():
+        if not _menu_tem_acao_folha(menu_filtros):
             aviso = menu_filtros.addAction("(nenhum plugin encontrado)")
             aviso.setEnabled(False)
 
