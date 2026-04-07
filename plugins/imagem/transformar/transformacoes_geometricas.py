@@ -37,7 +37,12 @@ class TransformacoesGeometricas(PluginBase):
     def setup_ui(self) -> None:
         """
         Configura os controles do plugin e suas conexões.
-        O plugin apresenta um conjunto de opções de transformação, cada uma representada por um botão de rádio.  O usuário pode escolher uma opção e clicar em "Aplicar" para confirmar a operação ou "Cancelar" para fechar o diálogo sem alterações. Enquanto o usuário ajusta as opções, uma pré-visualização da transformação é emitida para a janela principal.
+        O plugin apresenta um conjunto de opções de transformação,
+        cada uma representada por um botão de rádio. O usuário pode
+        escolher uma opção e clicar em "Aplicar" para confirmar a
+        operação ou "Cancelar" para fechar o diálogo sem alterações.
+        Enquanto o usuário ajusta as opções, uma pré-visualização da
+        transformação é emitida para a janela principal.
         """
         layout_principal = QVBoxLayout(self)
         layout_principal.addWidget(
@@ -71,7 +76,7 @@ class TransformacoesGeometricas(PluginBase):
         layout_botoes.addWidget(self._botao_cancelar)
         layout_principal.addLayout(layout_botoes)
 
-        self._grupo_opcoes.idClicked.connect(self._ao_mudar_opcao)
+        self._grupo_opcoes.buttonToggled.connect(self._ao_mudar_opcao)
         self._botao_aplicar.clicked.connect(self._ao_aplicar)
         self._botao_cancelar.clicked.connect(self.reject)
 
@@ -99,8 +104,10 @@ class TransformacoesGeometricas(PluginBase):
 
         return np.ascontiguousarray(resultado)
 
-    def _ao_mudar_opcao(self, _identificador: int) -> None:
-        """Emite pré-visualização da transformação escolhida."""
+    def _ao_mudar_opcao(self, _botao: QRadioButton, marcado: bool) -> None:
+        """Emite pré-visualização apenas quando a nova opção é marcada."""
+        if not marcado:
+            return
         imagem_processada = self.processar(self.imagem_original)
         self.preview_requested.emit(imagem_processada)
 
