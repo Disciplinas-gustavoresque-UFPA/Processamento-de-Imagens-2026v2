@@ -22,7 +22,7 @@ import sys
 import cv2
 import numpy as np
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QImage, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -30,8 +30,6 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
-    QScrollArea,
-    QSizePolicy,
     QStatusBar,
 )
 
@@ -42,6 +40,7 @@ if _DIRETORIO_RAIZ not in sys.path:
     sys.path.insert(0, _DIRETORIO_RAIZ)
 
 from core.plugin_base import PluginBase  # noqa: E402  (importação após sys.path)
+from components.zoom import VisualizadorImagem  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -139,7 +138,6 @@ def carregar_plugins_dinamicamente(
 # ---------------------------------------------------------------------------
 # Janela Principal
 # ---------------------------------------------------------------------------
-
 class JanelaPrincipal(QMainWindow):
     """Janela principal do Studio de Processamento de Imagens."""
 
@@ -161,23 +159,16 @@ class JanelaPrincipal(QMainWindow):
 
     def _construir_interface(self) -> None:
         """Cria o widget central (área de visualização da imagem)."""
-        self._label_imagem = QLabel("Abra uma imagem para começar.", self)
-        self._label_imagem.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._label_imagem.setSizePolicy(
-            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored
-        )
-        self._label_imagem.setScaledContents(False)
-
-        area_rolagem = QScrollArea(self)
-        area_rolagem.setWidget(self._label_imagem)
-        area_rolagem.setWidgetResizable(True)
-        area_rolagem.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setCentralWidget(area_rolagem)
+        self._visualizador = VisualizadorImagem(self)
+        self._visualizador.zoom_alterado.connect(self._ao_zoom_alterado)
+        self.setCentralWidget(self._visualizador)
 
         self.setStatusBar(QStatusBar(self))
+        self._label_zoom_status = QLabel("Zoom: 100%", self)
+        self.statusBar().addPermanentWidget(self._label_zoom_status)
 
     def _construir_menus(self) -> None:
-        """Cria a barra de menus com Arquivo, Pixels e Filtros."""
+        """Cria a barra de menus com Arquivo, Visualizar, Pixels e Filtros (plugins)."""
         barra = self.menuBar()
 
         # --- Menu Arquivo ---
@@ -191,6 +182,26 @@ class JanelaPrincipal(QMainWindow):
         acao_sair = menu_arquivo.addAction("Sair")
         acao_sair.triggered.connect(self.close)
 
+        # --- Menu Visualizar ---
+        menu_visualizar = barra.addMenu("Visualizar")
+
+        acao_zoom_mais = menu_visualizar.addAction("Aumentar zoom")
+        acao_zoom_mais.setShortcut(QKeySequence.StandardKey.ZoomIn)
+        acao_zoom_mais.triggered.connect(self._visualizador.aumentar_zoom)
+
+        acao_zoom_menos = menu_visualizar.addAction("Diminuir zoom")
+        acao_zoom_menos.setShortcut(QKeySequence.StandardKey.ZoomOut)
+        acao_zoom_menos.triggered.connect(self._visualizador.diminuir_zoom)
+
+        acao_ajustar = menu_visualizar.addAction("Ajustar à janela")
+        acao_ajustar.setShortcut("Ctrl+9")
+        acao_ajustar.triggered.connect(self._visualizador.ajustar_imagem_a_janela)
+
+        acao_zoom_100 = menu_visualizar.addAction("Zoom 100%")
+        acao_zoom_100.setShortcut("Ctrl+0")
+        acao_zoom_100.triggered.connect(self._visualizador.resetar_zoom)
+
+        # --- Menus de plugins (populados dinamicamente) ---
         # --- Menu Pixels (operações pontuais) ---
         menu_pixels = barra.addMenu("Pixels")
         diretorio_pixels = os.path.join(_DIRETORIO_RAIZ, "plugins", "pixels")
@@ -230,7 +241,7 @@ class JanelaPrincipal(QMainWindow):
             return
 
         self._imagem_atual = imagem_bgr
-        self._exibir_imagem(imagem_bgr)
+        self._exibir_imagem(imagem_bgr, ajustar_a_janela=True)
         self.statusBar().showMessage(f"Imagem carregada: {caminho}")
         
     def salvar_imagem(self) -> None:
@@ -312,14 +323,33 @@ class JanelaPrincipal(QMainWindow):
             self._exibir_imagem(self._imagem_atual)
             self._imagem_backup = None
 
+    def _ao_zoom_alterado(self, zoom: float) -> None:
+        """Atualiza o indicador permanente com o nível de zoom atual."""
+        nivel_zoom = round(zoom * 100)
+        self._label_zoom_status.setText(f"Zoom: {nivel_zoom:.0f}%")
+
+    def keyPressEvent(self, evento) -> None:
+        if evento.key() == Qt.Key.Key_Space and not evento.isAutoRepeat():
+            self._visualizador.definir_modo_arrasto(True)
+            evento.accept()
+            return
+        super().keyPressEvent(evento)
+
+    def keyReleaseEvent(self, evento) -> None:
+        if evento.key() == Qt.Key.Key_Space and not evento.isAutoRepeat():
+            self._visualizador.definir_modo_arrasto(False)
+            evento.accept()
+            return
+        super().keyReleaseEvent(evento)
+
     # ------------------------------------------------------------------
     # Utilitários de exibição
     # ------------------------------------------------------------------
 
-    def _exibir_imagem(self, imagem_bgr: np.ndarray) -> None:
+    def _exibir_imagem(self, imagem_bgr: np.ndarray, ajustar_a_janela: bool = False) -> None:
         """
-        Converte um array BGR para QPixmap e o exibe no label central,
-        ajustando o tamanho para caber na área disponível.
+        Converte um array BGR para QPixmap e delega a exibição ao
+        componente de visualização, preservando o zoom atual por padrão.
         """
         imagem_rgb = cv2.cvtColor(imagem_bgr, cv2.COLOR_BGR2RGB)
         altura, largura, canais = imagem_rgb.shape
@@ -332,14 +362,7 @@ class JanelaPrincipal(QMainWindow):
             QImage.Format.Format_RGB888,
         )
         pixmap = QPixmap.fromImage(qimage)
-
-        # Redimensiona mantendo a proporção para caber no label
-        pixmap_escalado = pixmap.scaled(
-            self._label_imagem.size(),
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-        self._label_imagem.setPixmap(pixmap_escalado)
+        self._visualizador.definir_pixmap(pixmap, ajustar_a_janela=ajustar_a_janela)
 
 
 # ---------------------------------------------------------------------------
