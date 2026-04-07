@@ -40,7 +40,7 @@ if _DIRETORIO_RAIZ not in sys.path:
     sys.path.insert(0, _DIRETORIO_RAIZ)
 
 from core.plugin_base import PluginBase  # noqa: E402  (importação após sys.path)
-from components.zoom.zoom import VisualizadorImagem  # noqa: E402
+from components.zoom import VisualizadorImagem  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
