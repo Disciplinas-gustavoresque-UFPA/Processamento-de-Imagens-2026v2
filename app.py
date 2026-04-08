@@ -202,7 +202,10 @@ class JanelaPrincipal(QMainWindow):
         menu_arquivo = barra.addMenu("Arquivo")
         acao_abrir = menu_arquivo.addAction("Abrir imagem…")
         acao_abrir.triggered.connect(self.abrir_imagem)
-        
+
+        acao_colar = menu_arquivo.addAction("Colar do clipboard")
+        acao_colar.triggered.connect(self.colar_imagem_clipboard)
+
         acao_salvar = menu_arquivo.addAction("Salvar imagem…")
         acao_salvar.triggered.connect(self.salvar_imagem)
         menu_arquivo.addSeparator()
