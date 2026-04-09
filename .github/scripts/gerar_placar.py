@@ -154,6 +154,7 @@ def atualizar_readme(data_badges):
         readme
     )
 
+
     for ranking_id, config in CONFIG_RANKINGS.items():
         ranking_alunos = data_badges[ranking_id]
         titulo = config["titulo"]
