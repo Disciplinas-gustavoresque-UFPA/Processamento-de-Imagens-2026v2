@@ -30,7 +30,11 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QPushButton,
+    QStackedWidget,
     QStatusBar,
+    QVBoxLayout,
+    QWidget,
 )
 
 # Garante que o diretório raiz do projeto esteja no sys.path para que os
@@ -159,9 +163,32 @@ class JanelaPrincipal(QMainWindow):
 
     def _construir_interface(self) -> None:
         """Cria o widget central (área de visualização da imagem)."""
+        self._stacked = QStackedWidget(self)
+
+        # Página 0: placeholder com botões para quando não há imagem
+        self._placeholder = QWidget(self)
+        layout_placeholder = QVBoxLayout(self._placeholder)
+        layout_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        btn_abrir = QPushButton("Abrir imagem…")
+        btn_abrir.setFixedSize(220, 44)
+        btn_abrir.clicked.connect(self.abrir_imagem)
+
+        btn_colar = QPushButton("Colar do clipboard")
+        btn_colar.setFixedSize(220, 44)
+        btn_colar.clicked.connect(self.colar_imagem_clipboard)
+
+        layout_placeholder.addWidget(btn_abrir)
+        layout_placeholder.addWidget(btn_colar)
+
+        # Página 1: visualizador de imagem
         self._visualizador = VisualizadorImagem(self)
         self._visualizador.zoom_alterado.connect(self._ao_zoom_alterado)
-        self.setCentralWidget(self._visualizador)
+
+        self._stacked.addWidget(self._placeholder)
+        self._stacked.addWidget(self._visualizador)
+        self._stacked.setCurrentIndex(0)
+        self.setCentralWidget(self._stacked)
 
         self.setStatusBar(QStatusBar(self))
         self._label_zoom_status = QLabel("Zoom: 100%", self)
@@ -175,7 +202,10 @@ class JanelaPrincipal(QMainWindow):
         menu_arquivo = barra.addMenu("Arquivo")
         acao_abrir = menu_arquivo.addAction("Abrir imagem…")
         acao_abrir.triggered.connect(self.abrir_imagem)
-        
+
+        acao_colar = menu_arquivo.addAction("Colar do clipboard")
+        acao_colar.triggered.connect(self.colar_imagem_clipboard)
+
         acao_salvar = menu_arquivo.addAction("Salvar imagem…")
         acao_salvar.triggered.connect(self.salvar_imagem)
         menu_arquivo.addSeparator()
@@ -241,6 +271,7 @@ class JanelaPrincipal(QMainWindow):
             return
 
         self._imagem_atual = imagem_bgr
+        self._stacked.setCurrentIndex(1)
         self._exibir_imagem(imagem_bgr, ajustar_a_janela=True)
         self.statusBar().showMessage(f"Imagem carregada: {caminho}")
         
@@ -266,6 +297,32 @@ class JanelaPrincipal(QMainWindow):
             self.statusBar().showMessage(f"Imagem salva em: {caminho}")
         else:
             QMessageBox.critical(self, "Erro", "Falha ao salvar a imagem.")
+
+    def colar_imagem_clipboard(self) -> None:
+        """Carrega uma imagem a partir do clipboard do sistema."""
+        clipboard = QApplication.clipboard()
+        qimage = clipboard.image()
+
+        if qimage.isNull():
+            QMessageBox.information(
+                self, "Aviso", "Não há imagem no clipboard."
+            )
+            return
+
+        qimage = qimage.convertToFormat(QImage.Format.Format_RGB888)
+        largura = qimage.width()
+        altura = qimage.height()
+        bytes_por_linha = qimage.bytesPerLine()
+        ptr = qimage.bits()
+
+        arr_rgb = np.array(ptr).reshape((altura, bytes_por_linha))[:, :largura * 3]
+        arr_rgb = arr_rgb.reshape((altura, largura, 3))
+        imagem_bgr = cv2.cvtColor(arr_rgb, cv2.COLOR_RGB2BGR)
+
+        self._imagem_atual = imagem_bgr
+        self._stacked.setCurrentIndex(1)
+        self._exibir_imagem(imagem_bgr, ajustar_a_janela=True)
+        self.statusBar().showMessage("Imagem colada do clipboard.")
 
     def abrir_plugin(self, classe_plugin: type) -> None:
         """
