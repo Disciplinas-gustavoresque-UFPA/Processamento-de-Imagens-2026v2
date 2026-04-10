@@ -69,6 +69,16 @@ class SaltPepperNoise(PluginBase):
 
         return noisy
 
+    def _gaussian_kernel(self, size: int) -> np.ndarray:
+        ax = np.arange(-size // 2 + 1., size // 2 + 1.)
+        xx, yy = np.meshgrid(ax, ax)
+
+        sigma = size / 2.0
+        kernel = np.exp(-(xx**2 + yy**2) / (2. * sigma**2))
+
+        return kernel / np.sum(kernel)
+
+
     def _apply_noise(self, img, y, x, value, kernel_size):
         k = kernel_size // 2
 
@@ -77,10 +87,27 @@ class SaltPepperNoise(PluginBase):
         x_min = max(0, x - k)
         x_max = min(img.shape[1], x + k + 1)
 
+        patch = img[y_min:y_max, x_min:x_max]
+
+        patch_h, patch_w = patch.shape[:2]
+
+        kernel = self._gaussian_kernel(kernel_size)
+
+        kh, kw = kernel.shape
+        ky = (kh - patch_h) // 2
+        kx = (kw - patch_w) // 2
+
+        kernel = kernel[ky:ky + patch_h, kx:kx + patch_w]
+
         if img.ndim == 2:
-            img[y_min:y_max, x_min:x_max] = value
+            img[y_min:y_max, x_min:x_max] = (
+                patch * (1 - kernel) + value * kernel
+            )
         else:
-            img[y_min:y_max, x_min:x_max, :] = value
+            for c in range(3):
+                img[y_min:y_max, x_min:x_max, c] = (
+                    patch[:, :, c] * (1 - kernel) + value * kernel
+                )
 
     def _on_change(self):
         self.label_amount.setText(f"Intensidade: {self.slider_amount.value()}%")
