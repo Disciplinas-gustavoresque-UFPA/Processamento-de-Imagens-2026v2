@@ -16,7 +16,7 @@ class SaltPepperNoise(PluginBase):
         self.slider_amount.setMaximum(100)
         self.slider_amount.setValue(5)
 
-        self.label_ratio = QLabel("Sal: 50%")
+        self.label_ratio = QLabel("Sal: 50% | Pimenta: 50%")
         self.slider_ratio = QSlider(Qt.Horizontal)
         self.slider_ratio.setMinimum(0)
         self.slider_ratio.setMaximum(100)
@@ -84,7 +84,9 @@ class SaltPepperNoise(PluginBase):
 
     def _on_change(self):
         self.label_amount.setText(f"Intensidade: {self.slider_amount.value()}%")
-        self.label_ratio.setText(f"Sal: {self.slider_ratio.value()}%")
+        sal = self.slider_ratio.value()
+        pimenta = 100 - sal
+        self.label_ratio.setText(f"Sal: {sal}% | Pimenta: {pimenta}%")
         self.label_kernel.setText(f"Tamanho: {self.slider_kernel.value()}")
 
         img = self.processar(self.imagem_original)
