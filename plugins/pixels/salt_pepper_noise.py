@@ -1,4 +1,6 @@
 import numpy as np
+import threading
+import cv2
 from PySide6.QtWidgets import QVBoxLayout, QSlider, QPushButton, QLabel
 from PySide6.QtCore import Qt
 from core.plugin_base import PluginBase
@@ -6,6 +8,11 @@ from core.plugin_base import PluginBase
 
 class SaltPepperNoise(PluginBase):
     display_name = "Ruído Salt and Pepper"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._kernel_cache = {}
+        self._timer = None
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -45,38 +52,66 @@ class SaltPepperNoise(PluginBase):
         self.slider_kernel.valueChanged.connect(self._on_change)
         self.btn_apply.clicked.connect(self._on_apply)
 
-    def processar(self, imagem: np.ndarray) -> np.ndarray:
-        noisy = imagem.copy()
-
-        amount = self.slider_amount.value() / 100.0
-        salt_ratio = self.slider_ratio.value() / 100.0
-        kernel_size = self.slider_kernel.value()
-
-        h, w = noisy.shape[:2]
-        total_pixels = h * w
-        num_noise = int((total_pixels * amount) / (kernel_size ** 2))
-
-        ys = np.random.randint(0, h, num_noise)
-        xs = np.random.randint(0, w, num_noise)
-
-        for i in range(num_noise):
-            if np.random.rand() < salt_ratio:
-                value = 255
-            else:
-                value = 0
-
-            self._apply_noise(noisy, ys[i], xs[i], value, kernel_size)
-
-        return noisy
+   
 
     def _gaussian_kernel(self, size: int) -> np.ndarray:
+        if size in self._kernel_cache:
+            return self._kernel_cache[size]
+
         ax = np.arange(-size // 2 + 1., size // 2 + 1.)
         xx, yy = np.meshgrid(ax, ax)
 
         sigma = size / 2.0
         kernel = np.exp(-(xx**2 + yy**2) / (2. * sigma**2))
+        kernel = kernel / np.sum(kernel)
 
-        return kernel / np.sum(kernel)
+        self._kernel_cache[size] = kernel
+        return kernel
+
+   
+
+    def processar(self, imagem: np.ndarray) -> np.ndarray:
+        img = imagem.astype(np.float32)
+
+        amount = self.slider_amount.value() / 100.0
+        salt_ratio = self.slider_ratio.value() / 100.0
+        kernel_size = self.slider_kernel.value()
+
+        h, w = img.shape[:2]
+
+        noise_map = np.random.rand(h, w).astype(np.float32)
+
+        threshold = 1.0 - amount
+        noise_mask = (noise_map > threshold).astype(np.float32)
+
+        sigma = kernel_size
+
+        blob_mask = cv2.GaussianBlur(
+            noise_mask,
+            (0, 0),
+            sigmaX=sigma,
+            sigmaY=sigma
+        )
+
+        blob_mask = np.clip(blob_mask, 0, 1)
+
+        salt = (np.random.rand(h, w) < salt_ratio).astype(np.float32)
+        pepper = 1.0 - salt
+
+        noise_layer = (salt * 255.0) + (pepper * 0.0)
+
+        if img.ndim == 2:
+            out = img * (1 - blob_mask) + noise_layer * blob_mask
+        else:
+            out = img.copy()
+            for c in range(3):
+                out[:, :, c] = (
+                    img[:, :, c] * (1 - blob_mask) +
+                    noise_layer * blob_mask
+                )
+
+        return np.clip(out, 0, 255).astype(np.uint8)
+
 
 
     def _apply_noise(self, img, y, x, value, kernel_size):
@@ -88,7 +123,6 @@ class SaltPepperNoise(PluginBase):
         x_max = min(img.shape[1], x + k + 1)
 
         patch = img[y_min:y_max, x_min:x_max]
-
         patch_h, patch_w = patch.shape[:2]
 
         kernel = self._gaussian_kernel(kernel_size)
@@ -109,6 +143,8 @@ class SaltPepperNoise(PluginBase):
                     patch[:, :, c] * (1 - kernel) + value * kernel
                 )
 
+    
+
     def _on_change(self):
         self.label_amount.setText(f"Intensidade: {self.slider_amount.value()}%")
         sal = self.slider_ratio.value()
@@ -116,6 +152,13 @@ class SaltPepperNoise(PluginBase):
         self.label_ratio.setText(f"Sal: {sal}% | Pimenta: {pimenta}%")
         self.label_kernel.setText(f"Tamanho: {self.slider_kernel.value()}")
 
+        if self._timer:
+            self._timer.cancel()
+
+        self._timer = threading.Timer(0.15, self._update_preview)
+        self._timer.start()
+
+    def _update_preview(self):
         img = self.processar(self.imagem_original)
         self.preview_requested.emit(img)
 
