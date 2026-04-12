@@ -11,7 +11,7 @@ from abc import abstractmethod
 
 import numpy as np
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import (QDialog, QWidget)
+from PySide6.QtWidgets import QDialog
 
 
 class PluginBase(QDialog):
@@ -73,11 +73,3 @@ class PluginBase(QDialog):
         np.ndarray
             Imagem resultante após o processamento.
         """
-
-    def get_widget(self) -> QWidget:
-        """
-        Retorna um widget com os controles do plugin para ser embutido
-        no painel lateral. Por padrão, retorna o próprio diálogo,
-        mas plugins podem sobrescrever para retornar um widget embutível.
-        """
-        return self
