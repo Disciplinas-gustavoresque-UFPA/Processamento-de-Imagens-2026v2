@@ -78,7 +78,7 @@ class FiltroBlur(PluginBase):
         if intensidade % 2 == 0:
             intensidade += 1
         
-        return tipo, intensidade
+        return tipo, intensidade 
     
     def processar(self, imagem: np.ndarray) -> np.ndarray:
         """
