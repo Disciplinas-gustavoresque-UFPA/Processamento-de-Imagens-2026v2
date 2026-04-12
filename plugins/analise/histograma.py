@@ -24,10 +24,14 @@ class HistogramaPlugin(PluginBase):
         self._label_hist = QLabel("Histograma aqui")
         self._label_hist.setAlignment(Qt.AlignCenter)
         self._label_hist.setMinimumHeight(200)
+
         self._canal_ativo = "RGB"
 
         self._canal_combo = QComboBox()
-        self._canal_combo.addItems(["RGB", "R (Vermelho)", "G (Verde)", "B (Azul)", "Cinza", "Alfa"])
+        self._canal_combo.addItems([
+            "RGB", "R (Vermelho)", "G (Verde)",
+            "B (Azul)", "Cinza", "Alfa"
+        ])
         self._canal_combo.currentTextChanged.connect(self._atualizar_canal)
 
         layout.addWidget(self._btn_atualizar)
@@ -39,76 +43,110 @@ class HistogramaPlugin(PluginBase):
         self.setLayout(layout)
         self.setMinimumWidth(400)
 
-        # Gera automaticamente ao abrir
+        # 🔷 Cache de histogramas
+        self._hist_cache = {}
+
         self._gerar_histograma()
 
-    # --------------------------------------------------
-    # Núcleo do histograma
-    # --------------------------------------------------
+    # ==================================================
+    # 🔥 API PÚBLICA (REUTILIZAÇÃO EM OUTROS PLUGINS)
+    # ==================================================
+    def get_histograma(self, canal=None):
+        """
+        Retorna histograma (ou lista de histogramas) já cacheado.
+        Pode ser usado por outros plugins.
+        """
+        canal = canal or self._canal_ativo
+        return self._obter_histograma(self.imagem_original, canal)
 
+    # ==================================================
+    # 🔥 CACHE
+    # ==================================================
+    def _obter_histograma(self, imagem, canal):
+        chave = (id(imagem), canal)
+
+        if chave in self._hist_cache:
+            return self._hist_cache[chave]
+
+        hists = self._calcular_histograma(imagem, canal)
+        self._hist_cache[chave] = hists
+
+        return hists
+
+    def limpar_cache(self):
+        """Use quando a imagem mudar"""
+        self._hist_cache.clear()
+
+    # ==================================================
+    # 🔥 CÁLCULO PURO
+    # ==================================================
+    def _calcular_histograma(self, imagem, canal):
+        if canal == "Cinza":
+            img = cv2.cvtColor(imagem, cv2.COLOR_RGB2GRAY)
+            hist = cv2.calcHist([img], [0], None, [256], [0, 256]).flatten()
+            return [hist]
+
+        canais = {
+            "B (Azul)": (0, (255, 0, 0)),
+            "G (Verde)": (1, (0, 255, 0)),
+            "R (Vermelho)": (2, (0, 0, 255)),
+        }
+
+        if canal == "RGB":
+            hists = []
+            for idx, _ in canais.values():
+                hist = cv2.calcHist([imagem], [idx], None, [256], [0, 256]).flatten()
+                hists.append(hist)
+            return hists
+
+        elif canal in canais:
+            idx, _ = canais[canal]
+            hist = cv2.calcHist([imagem], [idx], None, [256], [0, 256]).flatten()
+            return [hist]
+
+        return []
+
+    # ==================================================
+    # 🔥 PIPELINE PRINCIPAL
+    # ==================================================
     def _gerar_histograma(self):
         imagem = self.imagem_original
 
-        # --- Modo cinza tem prioridade ---
-        if self._canal_ativo == "Cinza":
-            imagem = cv2.cvtColor(imagem, cv2.COLOR_RGB2GRAY)
-            hist = cv2.calcHist([imagem], [0], None, [256], [0, 256]).flatten()
+        hists = self._obter_histograma(imagem, self._canal_ativo)
+        cores = self._obter_cores(self._canal_ativo)
 
-            img_hist = self._desenhar_histograma(
-                [hist],
-                cores=[(255, 255, 255)]
-            )
-
-        else:
-            canais = {
-                "B (Azul)": (0, (255, 0, 0)),
-                "G (Verde)": (1, (0, 255, 0)),
-                "R (Vermelho)": (2, (0, 0, 255)),
-            }
-
-            if self._canal_ativo == "RGB":
-                hists = []
-                cores = []
-                for nome, (idx, cor) in canais.items():
-                    hist = cv2.calcHist([imagem], [idx], None, [256], [0, 256]).flatten()
-                    hists.append(hist)
-                    cores.append(cor)
-
-            elif self._canal_ativo in canais:
-                idx, cor = canais[self._canal_ativo]
-                hist = cv2.calcHist([imagem], [idx], None, [256], [0, 256]).flatten()
-                hists = [hist]
-                cores = [cor]
-
-            else:
-                return  # fallback seguro
-
-            img_hist = self._desenhar_histograma(hists, cores)
-
+        img_hist = self._renderizar_histograma(hists, cores)
         self._exibir_histograma(img_hist)
 
-    # --------------------------------------------------
-    # Renderização manual
-    # --------------------------------------------------
+    # ==================================================
+    # 🔥 CORES
+    # ==================================================
+    def _obter_cores(self, canal):
+        mapa = {
+            "RGB": [(255, 0, 0), (0, 255, 0), (0, 0, 255)],
+            "R (Vermelho)": [(0, 0, 255)],
+            "G (Verde)": [(0, 255, 0)],
+            "B (Azul)": [(255, 0, 0)],
+            "Cinza": [(255, 255, 255)],
+        }
+        return mapa.get(canal, [(255, 255, 255)])
 
-    def _desenhar_histograma(self, hists, cores):
+    # ==================================================
+    # 🔥 RENDERIZAÇÃO
+    # ==================================================
+    def _renderizar_histograma(self, hists, cores):
         altura = 300
         largura = 512
 
-        # Canvas base (preto)
         base = np.zeros((altura, largura, 3), dtype=np.uint8)
-
-        x = np.arange(256) * 2  # escala horizontal
+        x = np.arange(256) * 2
 
         for hist, cor in zip(hists, cores):
             hist = hist.copy()
             cv2.normalize(hist, hist, 0, altura, cv2.NORM_MINMAX)
             hist = hist.flatten().astype(int)
 
-            # 🔷 Criar polígono fechado
             pts = np.column_stack((x, altura - hist))
-
-            # adicionar base (fechamento do polígono)
             pts = np.vstack([
                 pts,
                 [x[-1], altura],
@@ -117,22 +155,16 @@ class HistogramaPlugin(PluginBase):
 
             pts = pts.astype(np.int32).reshape((-1, 1, 2))
 
-            # 🔷 Camada temporária
             overlay = np.zeros_like(base)
-
-            # Preencher área
             cv2.fillPoly(overlay, [pts], cor)
 
-            # 🔷 Alpha blending (transparência)
-            alpha = 0.4
-            base = cv2.addWeighted(base, 1.0, overlay, alpha, 0)
+            base = cv2.addWeighted(base, 1.0, overlay, 0.4, 0)
 
         return base
 
-    # --------------------------------------------------
-    # Exibir no QLabel
-    # --------------------------------------------------
-
+    # ==================================================
+    # 🔥 EXIBIÇÃO
+    # ==================================================
     def _exibir_histograma(self, imagem_bgr):
         imagem_rgb = cv2.cvtColor(imagem_bgr, cv2.COLOR_BGR2RGB)
 
@@ -149,14 +181,11 @@ class HistogramaPlugin(PluginBase):
 
         pixmap = QPixmap.fromImage(qimg)
         self._label_hist.setPixmap(pixmap)
-        
+
     def _atualizar_canal(self, texto):
         self._canal_ativo = texto
         self._gerar_histograma()
 
-    # --------------------------------------------------
-    # Override (não altera imagem)
-    # --------------------------------------------------
-
+    # ==================================================
     def processar(self, imagem: np.ndarray) -> np.ndarray:
         return imagem
