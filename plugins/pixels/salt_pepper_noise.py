@@ -1,6 +1,7 @@
 import numpy as np
 import threading
 import cv2
+
 from PySide6.QtWidgets import QVBoxLayout, QSlider, QPushButton, QLabel
 from PySide6.QtCore import Qt
 from core.plugin_base import PluginBase
@@ -11,7 +12,6 @@ class SaltPepperNoise(PluginBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._kernel_cache = {}
         self._timer = None
 
     def setup_ui(self):
@@ -19,7 +19,7 @@ class SaltPepperNoise(PluginBase):
 
         self.label_amount = QLabel("Intensidade: 5%")
         self.slider_amount = QSlider(Qt.Horizontal)
-        self.slider_amount.setMinimum(1)
+        self.slider_amount.setMinimum(0)
         self.slider_amount.setMaximum(100)
         self.slider_amount.setValue(5)
 
@@ -35,6 +35,12 @@ class SaltPepperNoise(PluginBase):
         self.slider_kernel.setMaximum(7)
         self.slider_kernel.setValue(1)
 
+        self.label_alpha = QLabel("Opacidade: 100%")
+        self.slider_alpha = QSlider(Qt.Horizontal)
+        self.slider_alpha.setMinimum(0)
+        self.slider_alpha.setMaximum(100)
+        self.slider_alpha.setValue(100)
+
         self.btn_apply = QPushButton("Aplicar")
 
         layout.addWidget(self.label_amount)
@@ -43,6 +49,8 @@ class SaltPepperNoise(PluginBase):
         layout.addWidget(self.slider_ratio)
         layout.addWidget(self.label_kernel)
         layout.addWidget(self.slider_kernel)
+        layout.addWidget(self.label_alpha)
+        layout.addWidget(self.slider_alpha)
         layout.addWidget(self.btn_apply)
 
         self.setLayout(layout)
@@ -50,51 +58,61 @@ class SaltPepperNoise(PluginBase):
         self.slider_amount.valueChanged.connect(self._on_change)
         self.slider_ratio.valueChanged.connect(self._on_change)
         self.slider_kernel.valueChanged.connect(self._on_change)
+        self.slider_alpha.valueChanged.connect(self._on_change)
+
         self.btn_apply.clicked.connect(self._on_apply)
-   
 
     def processar(self, imagem: np.ndarray) -> np.ndarray:
-        img = imagem.astype(np.float32)
+        img = imagem.copy().astype(np.uint8)
 
         amount = self.slider_amount.value() / 100.0
         salt_ratio = self.slider_ratio.value() / 100.0
-        kernel_size = self.slider_kernel.value()
+        tamanho = self.slider_kernel.value()
+        alpha = self.slider_alpha.value() / 100.0
 
         h, w = img.shape[:2]
+        num_pixels = int(amount * h * w)
 
-        noise_map = np.random.rand(h, w).astype(np.float32)
+        if num_pixels == 0:
+            return img
 
-        threshold = 1.0 - amount
-        noise_mask = (noise_map > threshold).astype(np.float32)
+        coords = np.random.choice(h * w, num_pixels, replace=False)
+        ys = coords // w
+        xs = coords % w
 
-        sigma = kernel_size
+        num_salt = int(num_pixels * salt_ratio)
 
-        blob_mask = cv2.GaussianBlur(
-            noise_mask,
-            (0, 0),
-            sigmaX=sigma,
-            sigmaY=sigma
-        )
+        salt_mask = np.zeros((h, w), dtype=np.uint8)
+        pepper_mask = np.zeros((h, w), dtype=np.uint8)
 
-        blob_mask = np.clip(blob_mask, 0, 1)
+        salt_mask[ys[:num_salt], xs[:num_salt]] = 1
+        pepper_mask[ys[num_salt:], xs[num_salt:]] = 1
 
-        salt = (np.random.rand(h, w) < salt_ratio).astype(np.float32)
-        pepper = 1.0 - salt
+        if tamanho > 1:
+            kernel = np.ones((3, 3), np.uint8)
+            for _ in range(tamanho - 1):
+                salt_mask = cv2.dilate(salt_mask, kernel)
+                pepper_mask = cv2.dilate(pepper_mask, kernel)
 
-        noise_layer = (salt * 255.0) + (pepper * 0.0)
+            combined = (salt_mask | pepper_mask).astype(np.uint8)
+            coords = np.argwhere(combined == 1)
 
-        if img.ndim == 2:
-            out = img * (1 - blob_mask) + noise_layer * blob_mask
-        else:
-            out = img.copy()
-            for c in range(3):
-                out[:, :, c] = (
-                    img[:, :, c] * (1 - blob_mask) +
-                    noise_layer * blob_mask
-                )
+            if len(coords) > num_pixels:
+                idx = np.random.choice(len(coords), num_pixels, replace=False)
+                new_mask = np.zeros_like(combined)
+                selected = coords[idx]
+                new_mask[selected[:, 0], selected[:, 1]] = 1
+                salt_mask = salt_mask * new_mask
+                pepper_mask = pepper_mask * new_mask
 
-        return np.clip(out, 0, 255).astype(np.uint8)
+        noisy = img.copy()
 
+        noisy[salt_mask == 1] = 255
+        noisy[pepper_mask == 1] = 0
+
+        out = ((1 - alpha) * img + alpha * noisy).astype(np.uint8)
+
+        return out
 
     def _on_change(self):
         self.label_amount.setText(f"Intensidade: {self.slider_amount.value()}%")
@@ -102,6 +120,7 @@ class SaltPepperNoise(PluginBase):
         pimenta = 100 - sal
         self.label_ratio.setText(f"Sal: {sal}% | Pimenta: {pimenta}%")
         self.label_kernel.setText(f"Tamanho: {self.slider_kernel.value()}")
+        self.label_alpha.setText(f"Opacidade: {self.slider_alpha.value()}%")
 
         if self._timer:
             self._timer.cancel()
