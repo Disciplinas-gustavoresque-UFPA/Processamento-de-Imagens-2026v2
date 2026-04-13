@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QStatusBar,
 )
+from core.memento import Historico
 
 # Garante que o diretório raiz do projeto esteja no sys.path para que os
 # plugins possam importar ``core.plugin_base`` sem ajustes manuais.
@@ -149,7 +150,8 @@ class JanelaPrincipal(QMainWindow):
         # Estado interno
         self._imagem_atual: np.ndarray | None = None   # BGR (OpenCV)
         self._imagem_backup: np.ndarray | None = None  # cópia antes do plugin
-
+        
+        self._historico = Historico(limite=10)
         self._construir_interface()
         self._construir_menus()
 
@@ -308,7 +310,7 @@ class JanelaPrincipal(QMainWindow):
 
     def _ao_fechar_plugin(self, codigo: int) -> None:
         """Restaura o backup se o diálogo foi fechado sem confirmar."""
-        from PySide6.QtcdWidgets import QDialog
+        from PySide6.QtWidgets import QDialog
         if codigo != QDialog.DialogCode.Accepted:
             self._restaurar_backup()
 
