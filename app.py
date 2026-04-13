@@ -181,7 +181,14 @@ class JanelaPrincipal(QMainWindow):
         menu_arquivo.addSeparator()
         acao_sair = menu_arquivo.addAction("Sair")
         acao_sair.triggered.connect(self.close)
+        
+        # --- Menu Editar ---
+        menu_editar = barra.addMenu("Editar")
 
+        acao_desfazer = menu_editar.addAction("Desfazer")
+        acao_desfazer.setShortcut(QKeySequence.StandardKey.Undo)
+        acao_desfazer.triggered.connect(self.desfazer)
+        
         # --- Menu Visualizar ---
         menu_visualizar = barra.addMenu("Visualizar")
 
@@ -301,7 +308,7 @@ class JanelaPrincipal(QMainWindow):
 
     def _ao_fechar_plugin(self, codigo: int) -> None:
         """Restaura o backup se o diálogo foi fechado sem confirmar."""
-        from PySide6.QtWidgets import QDialog
+        from PySide6.QtcdWidgets import QDialog
         if codigo != QDialog.DialogCode.Accepted:
             self._restaurar_backup()
 
@@ -311,10 +318,24 @@ class JanelaPrincipal(QMainWindow):
         self._exibir_imagem(imagem_bgr)
 
     def _ao_aplicar_plugin(self, imagem_rgb: np.ndarray) -> None:
-        """Substitui a imagem de trabalho pela imagem processada."""
-        self._imagem_atual = cv2.cvtColor(imagem_rgb, cv2.COLOR_RGB2BGR)
-        self._imagem_backup = None
-        self.statusBar().showMessage("Filtro aplicado com sucesso.")
+         """Substitui a imagem de trabalho pela imagem processada."""
+         if self._imagem_atual is not None:
+              self._historico.salvar(self._imagem_atual)
+         self._imagem_atual = cv2.cvtColor(imagem_rgb, cv2.COLOR_RGB2BGR)
+
+         self.statusBar().showMessage("Filtro aplicado com sucesso.")
+         
+    def desfazer(self) -> None:
+        """Desfaz a última operação aplicada."""
+        estado = self._historico.desfazer()
+
+        if estado is None:
+            self.statusBar().showMessage("Nada para desfazer.")
+            return
+
+        self._imagem_atual = estado
+        self._exibir_imagem(self._imagem_atual)
+        self.statusBar().showMessage("Desfazer realizado.")
 
     def _restaurar_backup(self) -> None:
         """Restaura a imagem ao estado anterior à abertura do plugin."""
@@ -341,6 +362,12 @@ class JanelaPrincipal(QMainWindow):
             evento.accept()
             return
         super().keyReleaseEvent(evento)
+        
+    def keyPressEvent(self, evento) -> None:
+        if evento.matches(QKeySequence.StandardKey.Undo):
+            self.desfazer()
+            return
+        super().keyPressEvent(evento)
 
     # ------------------------------------------------------------------
     # Utilitários de exibição
