@@ -39,14 +39,21 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 ## 🏆 Hall da Fama - Placar Semanal da Turma
 
-> 🤖 *O robô está aquecendo os motores... O primeiro placar oficial será atualizado neste domingo à noite!*
+> 🤖 *Placar atualizado automaticamente em: 13/04/2026 00:05*
 
 ### ⌨️ Jack Bauer do Código
 *Quem mais codificou na semana (Volume total de linhas mescladas)*
 
 ![Jack Bauer](/.github/images/memes/image_5.png)
 
-🥇 **Ainda não há registros. Faça o primeiro PR!** (0 linhas mescladas)
+🥇 **@sayydaviid** (314 linhas mescladas)
+
+<details><summary>Ver Top 3 completo</summary>
+
+🥇 @sayydaviid (314)
+🥈 @ygarasab (116)
+
+</details>
 
 ---
 
@@ -55,7 +62,7 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 ![John Coffey](/.github/images/memes/image_6.png)
 
-🥇 **Ainda não há registros. Ajude um colega!** (0 badges acumuladas)
+🥇 **Ainda não há registros nesta semana.**
 
 ---
 
@@ -64,7 +71,7 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 ![Bug Catcher](/.github/images/memes/image_7.png)
 
-🥇 **Ainda não há registros. Encontre um erro!** (0 badges acumuladas)
+🥇 **Ainda não há registros nesta semana.**
 
 ---
 
@@ -73,7 +80,7 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 ![Patrick Bateman](/.github/images/memes/image_8.png)
 
-🥇 **Ainda não há registros. Escreva um código impecável!** (0 badges acumuladas)
+🥇 **Ainda não há registros nesta semana.**
 
 ---
 
@@ -82,7 +89,7 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 ![John Nash](/.github/images/memes/image_9.png)
 
-🥇 **Ainda não há registros. Mostre sua genialidade!** (0 badges acumuladas)
+🥇 **Ainda não há registros nesta semana.**
 
 ---
 
@@ -91,7 +98,7 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 ![Da Vinci](/.github/images/memes/image_10.png)
 
-🥇 **Ainda não há registros. Capriche na interface!** (0 badges acumuladas)
+🥇 **Ainda não há registros nesta semana.**
 
 ---
 
@@ -100,7 +107,7 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 ![Neo](/.github/images/memes/image_11.png)
 
-🥇 **Ainda não há registros. Manipule a matriz!** (0 badges acumuladas)
+🥇 **Ainda não há registros nesta semana.**
 
 ---
 
