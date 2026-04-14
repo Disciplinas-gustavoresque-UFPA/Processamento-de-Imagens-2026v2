@@ -1,9 +1,8 @@
 import numpy as np
-import threading
 import cv2
 
 from PySide6.QtWidgets import QVBoxLayout, QSlider, QPushButton, QLabel
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from core.plugin_base import PluginBase
 
 
@@ -12,7 +11,10 @@ class SaltPepperNoise(PluginBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._timer = None
+
+        self._timer = QTimer()
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._update_preview)
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -29,7 +31,7 @@ class SaltPepperNoise(PluginBase):
         self.slider_ratio.setMaximum(100)
         self.slider_ratio.setValue(50)
 
-        self.label_kernel = QLabel("Tamanho: 1")
+        self.label_kernel = QLabel("Tamanho do grão: 1")
         self.slider_kernel = QSlider(Qt.Horizontal)
         self.slider_kernel.setMinimum(1)
         self.slider_kernel.setMaximum(7)
@@ -65,9 +67,11 @@ class SaltPepperNoise(PluginBase):
     def processar(self, imagem: np.ndarray) -> np.ndarray:
         img = imagem.copy().astype(np.uint8)
 
-        amount = self.slider_amount.value() / 100.0
+        # Intensidade suavizada, evita saturação agressiva
+        amount = (self.slider_amount.value() / 100.0) * 0.25
+
         salt_ratio = self.slider_ratio.value() / 100.0
-        tamanho = self.slider_kernel.value()
+        kernel_size = self.slider_kernel.value()
         alpha = self.slider_alpha.value() / 100.0
 
         h, w = img.shape[:2]
@@ -88,22 +92,17 @@ class SaltPepperNoise(PluginBase):
         salt_mask[ys[:num_salt], xs[:num_salt]] = 1
         pepper_mask[ys[num_salt:], xs[num_salt:]] = 1
 
-        if tamanho > 1:
-            kernel = np.ones((3, 3), np.uint8)
-            for _ in range(tamanho - 1):
-                salt_mask = cv2.dilate(salt_mask, kernel)
-                pepper_mask = cv2.dilate(pepper_mask, kernel)
 
-            combined = (salt_mask | pepper_mask).astype(np.uint8)
-            coords = np.argwhere(combined == 1)
+        if kernel_size > 1:
+            kernel = np.ones((kernel_size, kernel_size), np.uint8)
 
-            if len(coords) > num_pixels:
-                idx = np.random.choice(len(coords), num_pixels, replace=False)
-                new_mask = np.zeros_like(combined)
-                selected = coords[idx]
-                new_mask[selected[:, 0], selected[:, 1]] = 1
-                salt_mask = salt_mask * new_mask
-                pepper_mask = pepper_mask * new_mask
+            salt_mask = cv2.dilate(salt_mask, kernel, iterations=1)
+            pepper_mask = cv2.dilate(pepper_mask, kernel, iterations=1)
+
+
+        overlap = (salt_mask == 1) & (pepper_mask == 1)
+        salt_mask[overlap] = 0
+        pepper_mask[overlap] = 0
 
         noisy = img.copy()
 
@@ -116,17 +115,15 @@ class SaltPepperNoise(PluginBase):
 
     def _on_change(self):
         self.label_amount.setText(f"Intensidade: {self.slider_amount.value()}%")
+
         sal = self.slider_ratio.value()
         pimenta = 100 - sal
         self.label_ratio.setText(f"Sal: {sal}% | Pimenta: {pimenta}%")
-        self.label_kernel.setText(f"Tamanho: {self.slider_kernel.value()}")
+
+        self.label_kernel.setText(f"Tamanho do grão: {self.slider_kernel.value()}")
         self.label_alpha.setText(f"Opacidade: {self.slider_alpha.value()}%")
 
-        if self._timer:
-            self._timer.cancel()
-
-        self._timer = threading.Timer(0.15, self._update_preview)
-        self._timer.start()
+        self._timer.start(150)
 
     def _update_preview(self):
         img = self.processar(self.imagem_original)
