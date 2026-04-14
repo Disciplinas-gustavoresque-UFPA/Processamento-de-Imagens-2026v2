@@ -7,10 +7,11 @@ Funcionalidades
 ---------------
 * Abrir imagens (PNG, JPG, BMP, TIFF).
 * Exibir a imagem em um QLabel centralizado com redimensionamento automático.
-* Carregar plugins dinamicamente em dois grupos de menu:
+* Carregar plugins dinamicamente em três grupos de menu:
     - ``Pixels`` para operações pontuais (ex.: brilho/contraste).
+    - ``Imagem`` para transformações geométricas e ajustes globais.
     - ``Filtros`` para operações regionais.
-* Pré-visualizar e aplicar filtros via os sinais ``preview_requested`` e
+* Pré-visualizar e aplicar plugins via os sinais ``preview_requested`` e
     ``apply_requested`` definidos em ``PluginBase``.
 """
 
@@ -81,6 +82,11 @@ def _carregar_classes_do_arquivo(caminho_arquivo: str) -> list[type]:
     return classes
 
 
+def _formatar_nome_menu(nome_pasta: str) -> str:
+    """Retorna o nome da pasta sem alterações para uso no submenu."""
+    return nome_pasta
+
+
 def carregar_plugins_dinamicamente(
     menu_pai: QMenu,
     diretorio: str,
@@ -111,7 +117,7 @@ def carregar_plugins_dinamicamente(
     for entrada in entradas:
         caminho = os.path.join(diretorio, entrada)
         if os.path.isdir(caminho) and not entrada.startswith("_"):
-            submenu = QMenu(entrada, menu_pai)
+            submenu = QMenu(_formatar_nome_menu(entrada), menu_pai)
             menu_pai.addMenu(submenu)
             carregar_plugins_dinamicamente(submenu, caminho, janela_principal)
 
@@ -133,6 +139,21 @@ def carregar_plugins_dinamicamente(
                 acao.triggered.connect(
                     lambda _checked=False, cls=classe_plugin: janela_principal.abrir_plugin(cls)
                 )
+
+
+def _menu_tem_acao_folha(menu: QMenu) -> bool:
+    """
+    Retorna ``True`` quando há ao menos uma ação de plugin no menu.
+
+    Ações que abrem submenus não contam; apenas ações "folha".
+    """
+    for acao in menu.actions():
+        submenu = acao.menu()
+        if submenu is None:
+            return True
+        if _menu_tem_acao_folha(submenu):
+            return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -168,7 +189,7 @@ class JanelaPrincipal(QMainWindow):
         self.statusBar().addPermanentWidget(self._label_zoom_status)
 
     def _construir_menus(self) -> None:
-        """Cria a barra de menus com Arquivo, Visualizar, Pixels e Filtros (plugins)."""
+        """Cria a barra de menus com Arquivo, Visualizar, Pixels, Imagem e Filtros (plugins)."""
         barra = self.menuBar()
 
         # --- Menu Arquivo ---
@@ -202,12 +223,21 @@ class JanelaPrincipal(QMainWindow):
         acao_zoom_100.triggered.connect(self._visualizador.resetar_zoom)
 
         # --- Menus de plugins (populados dinamicamente) ---
+        # --- Menu Imagem (transformações e ajustes globais) ---
+        menu_imagem = barra.addMenu("Imagem")
+        diretorio_imagem = os.path.join(_DIRETORIO_RAIZ, "plugins", "imagem")
+        carregar_plugins_dinamicamente(menu_imagem, diretorio_imagem, self)
+
+        if not _menu_tem_acao_folha(menu_imagem):
+            aviso = menu_imagem.addAction("(nenhum plugin encontrado)")
+            aviso.setEnabled(False)
+        
         # --- Menu Pixels (operações pontuais) ---
         menu_pixels = barra.addMenu("Pixels")
         diretorio_pixels = os.path.join(_DIRETORIO_RAIZ, "plugins", "pixels")
         carregar_plugins_dinamicamente(menu_pixels, diretorio_pixels, self)
 
-        if not menu_pixels.actions():
+        if not _menu_tem_acao_folha(menu_pixels):
             aviso = menu_pixels.addAction("(nenhum plugin encontrado)")
             aviso.setEnabled(False)
 
@@ -216,7 +246,7 @@ class JanelaPrincipal(QMainWindow):
         diretorio_filtros = os.path.join(_DIRETORIO_RAIZ, "plugins", "filtros")
         carregar_plugins_dinamicamente(menu_filtros, diretorio_filtros, self)
 
-        if not menu_filtros.actions():
+        if not _menu_tem_acao_folha(menu_filtros):
             aviso = menu_filtros.addAction("(nenhum plugin encontrado)")
             aviso.setEnabled(False)
 
