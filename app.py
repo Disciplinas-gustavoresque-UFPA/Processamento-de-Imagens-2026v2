@@ -223,15 +223,6 @@ class JanelaPrincipal(QMainWindow):
         acao_zoom_100.triggered.connect(self._visualizador.resetar_zoom)
 
         # --- Menus de plugins (populados dinamicamente) ---
-        # --- Menu Pixels (operações pontuais) ---
-        menu_pixels = barra.addMenu("Pixels")
-        diretorio_pixels = os.path.join(_DIRETORIO_RAIZ, "plugins", "pixels")
-        carregar_plugins_dinamicamente(menu_pixels, diretorio_pixels, self)
-
-        if not _menu_tem_acao_folha(menu_pixels):
-            aviso = menu_pixels.addAction("(nenhum plugin encontrado)")
-            aviso.setEnabled(False)
-
         # --- Menu Imagem (transformações e ajustes globais) ---
         menu_imagem = barra.addMenu("Imagem")
         diretorio_imagem = os.path.join(_DIRETORIO_RAIZ, "plugins", "imagem")
@@ -239,6 +230,15 @@ class JanelaPrincipal(QMainWindow):
 
         if not _menu_tem_acao_folha(menu_imagem):
             aviso = menu_imagem.addAction("(nenhum plugin encontrado)")
+            aviso.setEnabled(False)
+        
+        # --- Menu Pixels (operações pontuais) ---
+        menu_pixels = barra.addMenu("Pixels")
+        diretorio_pixels = os.path.join(_DIRETORIO_RAIZ, "plugins", "pixels")
+        carregar_plugins_dinamicamente(menu_pixels, diretorio_pixels, self)
+
+        if not _menu_tem_acao_folha(menu_pixels):
+            aviso = menu_pixels.addAction("(nenhum plugin encontrado)")
             aviso.setEnabled(False)
 
         # --- Menu Filtros (operações regionais) ---
