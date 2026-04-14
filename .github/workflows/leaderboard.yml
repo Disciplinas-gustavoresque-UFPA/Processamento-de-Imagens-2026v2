@@ -13,6 +13,9 @@ jobs:
     permissions:
       contents: write
       pull-requests: write # <-- Permissão explícita que faltava para abrir o PR
+    env:
+      # Força as actions a usarem o Node 24 e remove o warning
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Baixar o repositório

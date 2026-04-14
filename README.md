@@ -196,9 +196,9 @@ Para evitar o bloquei de threads (que um aluno pegue simultaneamente multiplas i
     ├── __init__.py               
     └── Filtros_Basicos/          # Subpastas criam submenus automaticamente!
         └── filtro_brilho.py      # Código do aluno
+```
 
 ---
-
 
 ## 🚀 Como Rodar
 
