@@ -22,16 +22,21 @@ import sys
 
 import cv2
 import numpy as np
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QImage, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
+    QHBoxLayout,
     QLabel,
     QMainWindow,
     QMenu,
     QMessageBox,
+    QPushButton,
+    QStackedWidget,
     QStatusBar,
+    QVBoxLayout,
+    QWidget,
 )
 
 # Garante que o diretório raiz do projeto esteja no sys.path para que os
@@ -42,6 +47,67 @@ if _DIRETORIO_RAIZ not in sys.path:
 
 from core.plugin_base import PluginBase  # noqa: E402  (importação após sys.path)
 from components.zoom import VisualizadorImagem  # noqa: E402
+
+
+# ---------------------------------------------------------------------------
+# Widget de arrastar e soltar (drag-and-drop)
+# ---------------------------------------------------------------------------
+
+_EXTENSOES_IMAGEM = (".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif")
+
+
+class AreaArrastarImagem(QLabel):
+    """Área visual onde o usuário pode arrastar e soltar um arquivo de imagem."""
+
+    arquivo_solto = Signal(str)
+
+    _ESTILO_NORMAL = """
+        QLabel {
+            border: 2px dashed #aaa;
+            border-radius: 8px;
+            color: #888;
+            font-size: 14px;
+            background-color: #f9f9f9;
+        }
+    """
+    _ESTILO_HOVER = """
+        QLabel {
+            border: 2px dashed #4a90d9;
+            border-radius: 8px;
+            color: #4a90d9;
+            font-size: 14px;
+            background-color: #e8f0fe;
+        }
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+        self.setText("Arraste uma imagem aqui")
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setFixedSize(420, 120)
+        self.setStyleSheet(self._ESTILO_NORMAL)
+
+    def dragEnterEvent(self, evento):
+        if evento.mimeData().hasUrls():
+            for url in evento.mimeData().urls():
+                if url.toLocalFile().lower().endswith(_EXTENSOES_IMAGEM):
+                    self.setStyleSheet(self._ESTILO_HOVER)
+                    evento.acceptProposedAction()
+                    return
+        evento.ignore()
+
+    def dragLeaveEvent(self, evento):
+        self.setStyleSheet(self._ESTILO_NORMAL)
+        super().dragLeaveEvent(evento)
+
+    def dropEvent(self, evento):
+        self.setStyleSheet(self._ESTILO_NORMAL)
+        for url in evento.mimeData().urls():
+            caminho = url.toLocalFile()
+            if caminho.lower().endswith(_EXTENSOES_IMAGEM):
+                self.arquivo_solto.emit(caminho)
+                return
 
 
 # ---------------------------------------------------------------------------
@@ -180,9 +246,70 @@ class JanelaPrincipal(QMainWindow):
 
     def _construir_interface(self) -> None:
         """Cria o widget central (área de visualização da imagem)."""
+        self._stacked = QStackedWidget(self)
+
+        # Página 0: placeholder com botões para quando não há imagem
+        self._placeholder = QWidget(self)
+        layout_placeholder = QVBoxLayout(self._placeholder)
+        layout_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # Título
+        titulo = QLabel("Studio de Processamento de Imagens")
+        titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        titulo.setStyleSheet("font-size: 22px; font-weight: bold; color: #333;")
+
+        subtitulo = QLabel("Comece abrindo ou arrastando uma imagem")
+        subtitulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitulo.setStyleSheet("font-size: 13px; color: #888;")
+
+        # Botões em linha
+        btn_nova = QPushButton("Nova Imagem")
+        btn_nova.setFixedSize(130, 40)
+
+        btn_abrir = QPushButton("Abrir imagem…")
+        btn_abrir.setFixedSize(130, 40)
+        btn_abrir.clicked.connect(self.abrir_imagem)
+
+        btn_colar = QPushButton("Colar do clipboard")
+        btn_colar.setFixedSize(150, 40)
+        btn_colar.clicked.connect(self.colar_imagem_clipboard)
+
+        layout_botoes = QHBoxLayout()
+        layout_botoes.setSpacing(10)
+        layout_botoes.addStretch()
+        layout_botoes.addWidget(btn_nova)
+        layout_botoes.addWidget(btn_abrir)
+        layout_botoes.addWidget(btn_colar)
+        layout_botoes.addStretch()
+
+        # Separador "ou"
+        separador = QLabel("— ou —")
+        separador.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        separador.setStyleSheet("font-size: 12px; color: #aaa;")
+
+        # Área de arrastar
+        area_arrastar = AreaArrastarImagem()
+        area_arrastar.arquivo_solto.connect(self._carregar_imagem_do_caminho)
+
+        layout_placeholder.addStretch()
+        layout_placeholder.addWidget(titulo)
+        layout_placeholder.addWidget(subtitulo)
+        layout_placeholder.addSpacing(24)
+        layout_placeholder.addLayout(layout_botoes)
+        layout_placeholder.addSpacing(12)
+        layout_placeholder.addWidget(separador)
+        layout_placeholder.addSpacing(12)
+        layout_placeholder.addWidget(area_arrastar, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout_placeholder.addStretch()
+
+        # Página 1: visualizador de imagem
         self._visualizador = VisualizadorImagem(self)
         self._visualizador.zoom_alterado.connect(self._ao_zoom_alterado)
-        self.setCentralWidget(self._visualizador)
+
+        self._stacked.addWidget(self._placeholder)
+        self._stacked.addWidget(self._visualizador)
+        self._stacked.setCurrentIndex(0)
+        self.setCentralWidget(self._stacked)
 
         self.setStatusBar(QStatusBar(self))
         self._label_zoom_status = QLabel("Zoom: 100%", self)
@@ -196,7 +323,10 @@ class JanelaPrincipal(QMainWindow):
         menu_arquivo = barra.addMenu("Arquivo")
         acao_abrir = menu_arquivo.addAction("Abrir imagem…")
         acao_abrir.triggered.connect(self.abrir_imagem)
-        
+
+        acao_colar = menu_arquivo.addAction("Colar do clipboard")
+        acao_colar.triggered.connect(self.colar_imagem_clipboard)
+
         acao_salvar = menu_arquivo.addAction("Salvar imagem…")
         acao_salvar.triggered.connect(self.salvar_imagem)
         menu_arquivo.addSeparator()
@@ -262,15 +392,18 @@ class JanelaPrincipal(QMainWindow):
             "",
             "Imagens (*.png *.jpg *.jpeg *.bmp *.tiff *.tif)",
         )
-        if not caminho:
-            return
+        if caminho:
+            self._carregar_imagem_do_caminho(caminho)
 
+    def _carregar_imagem_do_caminho(self, caminho: str) -> None:
+        """Carrega uma imagem a partir do caminho informado."""
         imagem_bgr = cv2.imread(caminho)
         if imagem_bgr is None:
             QMessageBox.critical(self, "Erro", f"Não foi possível abrir:\n{caminho}")
             return
 
         self._imagem_atual = imagem_bgr
+        self._stacked.setCurrentIndex(1)
         self._exibir_imagem(imagem_bgr, ajustar_a_janela=True)
         self.statusBar().showMessage(f"Imagem carregada: {caminho}")
         
@@ -296,6 +429,32 @@ class JanelaPrincipal(QMainWindow):
             self.statusBar().showMessage(f"Imagem salva em: {caminho}")
         else:
             QMessageBox.critical(self, "Erro", "Falha ao salvar a imagem.")
+
+    def colar_imagem_clipboard(self) -> None:
+        """Carrega uma imagem a partir do clipboard do sistema."""
+        clipboard = QApplication.clipboard()
+        qimage = clipboard.image()
+
+        if qimage.isNull():
+            QMessageBox.information(
+                self, "Aviso", "Não há imagem no clipboard."
+            )
+            return
+
+        qimage = qimage.convertToFormat(QImage.Format.Format_RGB888)
+        largura = qimage.width()
+        altura = qimage.height()
+        bytes_por_linha = qimage.bytesPerLine()
+        ptr = qimage.bits()
+
+        arr_rgb = np.array(ptr).reshape((altura, bytes_por_linha))[:, :largura * 3]
+        arr_rgb = arr_rgb.reshape((altura, largura, 3))
+        imagem_bgr = cv2.cvtColor(arr_rgb, cv2.COLOR_RGB2BGR)
+
+        self._imagem_atual = imagem_bgr
+        self._stacked.setCurrentIndex(1)
+        self._exibir_imagem(imagem_bgr, ajustar_a_janela=True)
+        self.statusBar().showMessage("Imagem colada do clipboard.")
 
     def abrir_plugin(self, classe_plugin: type) -> None:
         """
