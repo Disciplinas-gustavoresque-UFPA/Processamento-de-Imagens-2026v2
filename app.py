@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from core.memento import Historico
 
 # Garante que o diretório raiz do projeto esteja no sys.path para que os
 # plugins possam importar ``core.plugin_base`` sem ajustes manuais.
@@ -236,7 +237,8 @@ class JanelaPrincipal(QMainWindow):
         # Estado interno
         self._imagem_atual: np.ndarray | None = None   # BGR (OpenCV)
         self._imagem_backup: np.ndarray | None = None  # cópia antes do plugin
-
+        
+        self._historico = Historico(limite=10)
         self._construir_interface()
         self._construir_menus()
 
@@ -332,7 +334,14 @@ class JanelaPrincipal(QMainWindow):
         menu_arquivo.addSeparator()
         acao_sair = menu_arquivo.addAction("Sair")
         acao_sair.triggered.connect(self.close)
+        
+        # --- Menu Editar ---
+        menu_editar = barra.addMenu("Editar")
 
+        acao_desfazer = menu_editar.addAction("Desfazer")
+        acao_desfazer.setShortcut(QKeySequence.StandardKey.Undo)
+        acao_desfazer.triggered.connect(self.desfazer)
+        
         # --- Menu Visualizar ---
         menu_visualizar = barra.addMenu("Visualizar")
 
@@ -500,10 +509,24 @@ class JanelaPrincipal(QMainWindow):
         self._exibir_imagem(imagem_bgr)
 
     def _ao_aplicar_plugin(self, imagem_rgb: np.ndarray) -> None:
-        """Substitui a imagem de trabalho pela imagem processada."""
-        self._imagem_atual = cv2.cvtColor(imagem_rgb, cv2.COLOR_RGB2BGR)
-        self._imagem_backup = None
-        self.statusBar().showMessage("Filtro aplicado com sucesso.")
+         """Substitui a imagem de trabalho pela imagem processada."""
+         if self._imagem_atual is not None:
+              self._historico.salvar(self._imagem_atual)
+         self._imagem_atual = cv2.cvtColor(imagem_rgb, cv2.COLOR_RGB2BGR)
+
+         self.statusBar().showMessage("Filtro aplicado com sucesso.")
+         
+    def desfazer(self) -> None:
+        """Desfaz a última operação aplicada."""
+        estado = self._historico.desfazer()
+
+        if estado is None:
+            self.statusBar().showMessage("Nada para desfazer.")
+            return
+
+        self._imagem_atual = estado
+        self._exibir_imagem(self._imagem_atual)
+        self.statusBar().showMessage("Desfazer realizado.")
 
     def _restaurar_backup(self) -> None:
         """Restaura a imagem ao estado anterior à abertura do plugin."""
@@ -530,6 +553,12 @@ class JanelaPrincipal(QMainWindow):
             evento.accept()
             return
         super().keyReleaseEvent(evento)
+        
+    def keyPressEvent(self, evento) -> None:
+        if evento.matches(QKeySequence.StandardKey.Undo):
+            self.desfazer()
+            return
+        super().keyPressEvent(evento)
 
     # ------------------------------------------------------------------
     # Utilitários de exibição
