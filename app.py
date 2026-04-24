@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QStackedWidget,
     QStatusBar,
+    QDialog
     QVBoxLayout,
     QWidget,
 )
@@ -47,6 +48,7 @@ if _DIRETORIO_RAIZ not in sys.path:
 
 from core.plugin_base import PluginBase  # noqa: E402  (importação após sys.path)
 from components.zoom import VisualizadorImagem  # noqa: E402
+from camera.gerenciar_camera import DialogoCamera
 
 
 # ---------------------------------------------------------------------------
@@ -324,6 +326,11 @@ class JanelaPrincipal(QMainWindow):
         acao_abrir = menu_arquivo.addAction("Abrir imagem…")
         acao_abrir.triggered.connect(self.abrir_imagem)
 
+        # NOVO: Adicionar opção de captura
+        acao_camera = menu_arquivo.addAction("Capturar da Câmera")
+        acao_camera.setShortcut("Ctrl+K")
+        acao_camera.triggered.connect(self.capturar_da_camera)
+        
         acao_colar = menu_arquivo.addAction("Colar do clipboard")
         acao_colar.triggered.connect(self.colar_imagem_clipboard)
 
@@ -483,6 +490,21 @@ class JanelaPrincipal(QMainWindow):
         dialogo.finished.connect(self._ao_fechar_plugin)
 
         dialogo.exec()
+
+    def capturar_da_camera(self) -> None:
+        """Abre a janela de preview e captura a imagem ao confirmar."""
+        dialogo = DialogoCamera(self)
+        
+        # Se o usuário clicar em "Tirar Foto" (accept)
+        if dialogo.exec() == QDialog.DialogCode.Accepted:
+            frame = dialogo.get_frame()
+            if frame is not None:
+                self._imagem_atual = frame
+                self._exibir_imagem(self._imagem_atual, ajustar_a_janela=True)
+                self.statusBar().showMessage("Imagem capturada via Live Preview.")
+        
+        # Garante que a câmera seja liberada mesmo se o diálogo for fechado
+        dialogo.cap.release()
 
     # ------------------------------------------------------------------
     # Slots privados
