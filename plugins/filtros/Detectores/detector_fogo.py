@@ -14,6 +14,7 @@ Funcionalidades
 import cv2
 import numpy as np
 import logging
+import os
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -25,14 +26,15 @@ from PySide6.QtWidgets import (
     QSlider,
 )
 
-# Configuração básica de logging
-import os
+# Configuração de logger dedicada ao plugin (sem alterar logger global da aplicação)
 _LOG_PATH = os.path.join(os.path.dirname(__file__), 'detector_fogo.log')
-logging.basicConfig(
-    filename=_LOG_PATH,
-    level=logging.WARNING,
-    format='%(asctime)s %(levelname)s %(message)s'
-)
+_LOGGER = logging.getLogger(__name__)
+_LOGGER.setLevel(logging.WARNING)
+if not _LOGGER.handlers:
+    _handler = logging.FileHandler(_LOG_PATH, encoding='utf-8')
+    _handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
+    _LOGGER.addHandler(_handler)
+_LOGGER.propagate = False
 
 from core.plugin_base import PluginBase
 
@@ -178,7 +180,7 @@ class DetectorFogo(PluginBase):
 
         # Validação da imagem de entrada
         if not isinstance(imagem, np.ndarray) or imagem.ndim != 3 or imagem.shape[2] != 3:
-            logging.error(f"Imagem de entrada inválida: type={type(imagem)}, shape={getattr(imagem, 'shape', None)}")
+            _LOGGER.error(f"Imagem de entrada inválida: type={type(imagem)}, shape={getattr(imagem, 'shape', None)}")
             QMessageBox.critical(self, "Erro", "Imagem de entrada inválida para detecção de fogo.")
             return np.zeros((100, 100, 3), dtype=np.uint8)
 
@@ -190,7 +192,7 @@ class DetectorFogo(PluginBase):
                 modelo = self._carregar_modelo(self._API_KEY)
             except ModuleNotFoundError as e:
                 if e.name == "roboflow":
-                    logging.error("Dependência 'roboflow' não encontrada no ambiente.")
+                    _LOGGER.error("Dependência 'roboflow' não encontrada no ambiente.")
                     QMessageBox.critical(
                         self,
                         "Dependência ausente",
@@ -200,7 +202,7 @@ class DetectorFogo(PluginBase):
                     return imagem.copy()
                 raise
             except Exception as e:
-                logging.error(f"Erro ao carregar modelo Roboflow: {e}")
+                _LOGGER.error(f"Erro ao carregar modelo Roboflow: {e}")
                 QMessageBox.critical(self, "Erro na detecção", f"Erro ao carregar modelo Roboflow:\n\n{e}")
                 return imagem.copy()
 
@@ -214,7 +216,7 @@ class DetectorFogo(PluginBase):
                     temp_path = tmp.name
                     imagem_bgr = cv2.cvtColor(imagem, cv2.COLOR_RGB2BGR)
                     if not cv2.imwrite(temp_path, imagem_bgr):
-                        logging.error(f"Falha ao gravar imagem temporária em disco: {temp_path}")
+                        _LOGGER.error(f"Falha ao gravar imagem temporária em disco: {temp_path}")
                         QMessageBox.critical(
                             self,
                             "Erro",
@@ -222,7 +224,7 @@ class DetectorFogo(PluginBase):
                         )
                         return imagem.copy()
             except Exception as e:
-                logging.error(f"Erro ao salvar imagem temporária: {e}")
+                _LOGGER.error(f"Erro ao salvar imagem temporária: {e}")
                 QMessageBox.critical(self, "Erro", f"Erro ao salvar imagem temporária: {e}")
                 return imagem.copy()
 
@@ -230,15 +232,15 @@ class DetectorFogo(PluginBase):
             try:
                 resultado = modelo.predict(temp_path, confidence=confianca).json()
             except Exception as e:
-                logging.error(f"Erro ao conectar com a API do Roboflow: {e}")
+                _LOGGER.error(f"Erro ao conectar com a API do Roboflow: {e}")
                 QMessageBox.critical(self, "Erro na detecção", f"Erro ao conectar com a API do Roboflow:\n\n{str(e)}")
                 return imagem.copy()
 
             # Valida resposta da API
             import json
-            logging.warning(f"Resultado bruto da API Roboflow: {json.dumps(resultado, indent=2, ensure_ascii=False)}")
+            _LOGGER.warning(f"Resultado bruto da API Roboflow: {json.dumps(resultado, indent=2, ensure_ascii=False)}")
             if not isinstance(resultado, dict) or 'predictions' not in resultado or not isinstance(resultado['predictions'], list):
-                logging.error(f"Resposta inesperada da API: {resultado}")
+                _LOGGER.error(f"Resposta inesperada da API: {resultado}")
                 QMessageBox.critical(self, "Erro na detecção", "Resposta inesperada da API do Roboflow.")
                 return imagem.copy()
 
@@ -249,7 +251,7 @@ class DetectorFogo(PluginBase):
                 try:
                     os.unlink(temp_path)
                 except Exception as e:
-                    logging.error(f"Erro ao remover arquivo temporário: {e}")
+                    _LOGGER.error(f"Erro ao remover arquivo temporário: {e}")
 
         # Cria cópia da imagem para desenhar as detecções
         imagem_resultado = imagem.copy()
@@ -313,7 +315,7 @@ class DetectorFogo(PluginBase):
                         cv2.LINE_AA,
                     )
             except Exception as e:
-                logging.error(f"Erro ao processar caixa delimitadora: {e} | pred: {pred}")
+                _LOGGER.error(f"Erro ao processar caixa delimitadora: {e} | pred: {pred}")
 
         # Atualiza estatísticas de detecção
         self._ultima_contagem = contagem
@@ -369,7 +371,7 @@ class DetectorFogo(PluginBase):
             self._ultima_imagem_processada = imagem_processada
             self.preview_requested.emit(imagem_processada)
         except Exception as e:
-            logging.error(f"Erro inesperado ao detectar fogo e fumaça: {e}")
+            _LOGGER.error(f"Erro inesperado ao detectar fogo e fumaça: {e}")
             QMessageBox.critical(self, "Erro na detecção", f"Erro inesperado:\n\n{e}")
         finally:
             # Restaurar cursor e botão
