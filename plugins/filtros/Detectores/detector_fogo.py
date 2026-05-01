@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 import logging
 import os
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QCheckBox,
     QHBoxLayout,
@@ -27,7 +27,11 @@ from PySide6.QtWidgets import (
 )
 
 # Configuração de logger dedicada ao plugin (sem alterar logger global da aplicação)
-_LOG_PATH = os.path.join(os.path.dirname(__file__), 'detector_fogo.log')
+# O arquivo é gravado em diretório de dados do usuário para evitar problemas de permissão.
+_BASE_DADOS_USUARIO = os.getenv('APPDATA') or os.path.join(os.path.expanduser('~'), '.local', 'share')
+_DIR_LOG = os.path.join(_BASE_DADOS_USUARIO, 'Processamento-de-Imagens-2026v2', 'logs')
+os.makedirs(_DIR_LOG, exist_ok=True)
+_LOG_PATH = os.path.join(_DIR_LOG, 'detector_fogo.log')
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.WARNING)
 if not _LOGGER.handlers:
@@ -37,6 +41,39 @@ if not _LOGGER.handlers:
 _LOGGER.propagate = False
 
 from core.plugin_base import PluginBase
+
+
+class _DetectorFogoWorker(QObject):
+    """Worker para executar inferência sem bloquear a interface gráfica."""
+
+    concluido = Signal(object, int, float)
+    falha = Signal(str)
+
+    def __init__(
+        self,
+        plugin: "DetectorFogo",
+        imagem: np.ndarray,
+        confianca: int,
+        mostrar_boxes: bool,
+    ) -> None:
+        super().__init__()
+        self._plugin = plugin
+        self._imagem = imagem
+        self._confianca = confianca
+        self._mostrar_boxes = mostrar_boxes
+
+    @Slot()
+    def run(self) -> None:
+        try:
+            imagem_resultado, contagem, confianca_media = self._plugin._processar_deteccao(
+                self._imagem,
+                self._confianca,
+                self._mostrar_boxes,
+            )
+            self.concluido.emit(imagem_resultado, contagem, confianca_media)
+        except Exception as e:
+            _LOGGER.error(f"Erro na execução assíncrona da detecção: {e}")
+            self.falha.emit(str(e))
 
 
 class DetectorFogo(PluginBase):
@@ -163,106 +200,67 @@ class DetectorFogo(PluginBase):
     # Lógica de processamento
     # ------------------------------------------------------------------
 
-    def processar(self, imagem: np.ndarray) -> np.ndarray:
-        """
-        Executa a detecção de fogo e fumaça na imagem via API Roboflow.
+    def _processar_deteccao(
+        self,
+        imagem: np.ndarray,
+        confianca: int,
+        mostrar_boxes: bool,
+    ) -> tuple[np.ndarray, int, float]:
+        """Executa a detecção e retorna imagem processada e métricas."""
 
-        Parâmetros
-        ----------
-        imagem : np.ndarray
-            Imagem RGB de entrada.
-
-        Retorna
-        -------
-        np.ndarray
-            Imagem com caixas delimitadoras desenhadas (se habilitado).
-        """
-
-        # Validação da imagem de entrada
         if not isinstance(imagem, np.ndarray) or imagem.ndim != 3 or imagem.shape[2] != 3:
-            _LOGGER.error(f"Imagem de entrada inválida: type={type(imagem)}, shape={getattr(imagem, 'shape', None)}")
-            QMessageBox.critical(self, "Erro", "Imagem de entrada inválida para detecção de fogo.")
-            return np.zeros((100, 100, 3), dtype=np.uint8)
-
+            raise ValueError("Imagem de entrada inválida para detecção de fogo.")
 
         temp_path = None
         try:
-            # Carrega o modelo Roboflow em cache
             try:
                 modelo = self._carregar_modelo(self._API_KEY)
             except ModuleNotFoundError as e:
                 if e.name == "roboflow":
-                    _LOGGER.error("Dependência 'roboflow' não encontrada no ambiente.")
-                    QMessageBox.critical(
-                        self,
-                        "Dependência ausente",
-                        "A biblioteca 'roboflow' não está instalada.\n\n"
-                        "Instale com: pip install -r requirements.txt",
-                    )
-                    return imagem.copy()
+                    raise RuntimeError(
+                        "A biblioteca 'roboflow' não está instalada. "
+                        "Instale com: pip install -r requirements.txt"
+                    ) from e
                 raise
             except Exception as e:
-                _LOGGER.error(f"Erro ao carregar modelo Roboflow: {e}")
-                QMessageBox.critical(self, "Erro na detecção", f"Erro ao carregar modelo Roboflow:\n\n{e}")
-                return imagem.copy()
+                raise RuntimeError(f"Erro ao carregar modelo Roboflow: {e}") from e
 
-            confianca = self._slider_confianca.value()
-
-            # Salva imagem temporária para enviar à API
             import tempfile
-            import os
+
             try:
                 with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
                     temp_path = tmp.name
                     imagem_bgr = cv2.cvtColor(imagem, cv2.COLOR_RGB2BGR)
                     if not cv2.imwrite(temp_path, imagem_bgr):
-                        _LOGGER.error(f"Falha ao gravar imagem temporária em disco: {temp_path}")
-                        QMessageBox.critical(
-                            self,
-                            "Erro",
-                            "Falha ao gravar imagem temporária para detecção de fogo.",
-                        )
-                        return imagem.copy()
+                        raise RuntimeError("Falha ao gravar imagem temporária para detecção de fogo.")
             except Exception as e:
-                _LOGGER.error(f"Erro ao salvar imagem temporária: {e}")
-                QMessageBox.critical(self, "Erro", f"Erro ao salvar imagem temporária: {e}")
-                return imagem.copy()
+                raise RuntimeError(f"Erro ao salvar imagem temporária: {e}") from e
 
-            # Executa inferência via API Roboflow
             try:
                 resultado = modelo.predict(temp_path, confidence=confianca).json()
             except Exception as e:
-                _LOGGER.error(f"Erro ao conectar com a API do Roboflow: {e}")
-                QMessageBox.critical(self, "Erro na detecção", f"Erro ao conectar com a API do Roboflow:\n\n{str(e)}")
-                return imagem.copy()
+                raise RuntimeError(f"Erro ao conectar com a API do Roboflow: {e}") from e
 
-            # Valida resposta da API
             import json
+
             _LOGGER.warning(f"Resultado bruto da API Roboflow: {json.dumps(resultado, indent=2, ensure_ascii=False)}")
             if not isinstance(resultado, dict) or 'predictions' not in resultado or not isinstance(resultado['predictions'], list):
-                _LOGGER.error(f"Resposta inesperada da API: {resultado}")
-                QMessageBox.critical(self, "Erro na detecção", "Resposta inesperada da API do Roboflow.")
-                return imagem.copy()
+                raise RuntimeError("Resposta inesperada da API do Roboflow.")
 
         finally:
-            # Remove arquivo temporário, se existir
-            import os
             if temp_path and os.path.exists(temp_path):
                 try:
                     os.unlink(temp_path)
                 except Exception as e:
                     _LOGGER.error(f"Erro ao remover arquivo temporário: {e}")
 
-        # Cria cópia da imagem para desenhar as detecções
         imagem_resultado = imagem.copy()
         predicoes = resultado.get('predictions', [])
         contagem = len(predicoes)
         confidencias = []
-        mostrar_boxes = self._checkbox_boxes.isChecked()
 
         for pred in predicoes:
             try:
-                # Processa e desenha cada caixa delimitadora
                 x_center = pred['x']
                 y_center = pred['y']
                 width = pred['width']
@@ -277,9 +275,9 @@ class DetectorFogo(PluginBase):
                 nome_classe = classe_original.capitalize()
                 if mostrar_boxes:
                     if classe_original.lower() == 'smoke':
-                        cor = (128, 128, 128)  # Cinza para fumaça
+                        cor = (128, 128, 128)
                     else:
-                        cor = (255, 100, 0)    # Laranja para fogo
+                        cor = (255, 100, 0)
                     cv2.rectangle(imagem_resultado, (x1, y1), (x2, y2), cor, 3)
                     label = f"{nome_classe}: {conf:.1%}"
                     tamanho_fonte = 0.55
@@ -317,14 +315,42 @@ class DetectorFogo(PluginBase):
             except Exception as e:
                 _LOGGER.error(f"Erro ao processar caixa delimitadora: {e} | pred: {pred}")
 
-        # Atualiza estatísticas de detecção
-        self._ultima_contagem = contagem
-        self._ultima_confianca_media = (
-            sum(confidencias) / len(confidencias) if confidencias else 0.0
-        )
-        self._atualizar_estatisticas()
+        confianca_media = sum(confidencias) / len(confidencias) if confidencias else 0.0
+        return imagem_resultado, contagem, confianca_media
 
-        return imagem_resultado
+    def processar(self, imagem: np.ndarray) -> np.ndarray:
+        """
+        Executa a detecção de fogo e fumaça na imagem via API Roboflow.
+
+        Parâmetros
+        ----------
+        imagem : np.ndarray
+            Imagem RGB de entrada.
+
+        Retorna
+        -------
+        np.ndarray
+            Imagem com caixas delimitadoras desenhadas (se habilitado).
+        """
+
+        try:
+            confianca = self._slider_confianca.value()
+            mostrar_boxes = self._checkbox_boxes.isChecked()
+            imagem_resultado, contagem, confianca_media = self._processar_deteccao(
+                imagem,
+                confianca,
+                mostrar_boxes,
+            )
+            self._ultima_contagem = contagem
+            self._ultima_confianca_media = confianca_media
+            self._atualizar_estatisticas()
+            return imagem_resultado
+        except Exception as e:
+            _LOGGER.error(f"Erro ao processar detecção: {e}")
+            QMessageBox.critical(self, "Erro na detecção", str(e))
+            if isinstance(imagem, np.ndarray):
+                return imagem.copy()
+            return np.zeros((100, 100, 3), dtype=np.uint8)
 
     def _atualizar_estatisticas(self) -> None:
         """Atualiza o rótulo de estatísticas com contagem e confiança média."""
@@ -360,30 +386,77 @@ class DetectorFogo(PluginBase):
             "font-weight: bold; padding: 10px; color: #1e90ff;"
         )
         self._btn_detectar.setEnabled(False)
+        self._btn_aplicar.setEnabled(False)
         self.setCursor(Qt.CursorShape.WaitCursor)
 
         # Forçar atualização da interface antes do processamento
         from PySide6.QtWidgets import QApplication
         QApplication.processEvents()
 
-        try:
-            imagem_processada = self.processar(self.imagem_original)
-            self._ultima_imagem_processada = imagem_processada
-            self.preview_requested.emit(imagem_processada)
-        except Exception as e:
-            _LOGGER.error(f"Erro inesperado ao detectar fogo e fumaça: {e}")
-            QMessageBox.critical(self, "Erro na detecção", f"Erro inesperado:\n\n{e}")
-        finally:
-            # Restaurar cursor e botão
-            self.setCursor(Qt.CursorShape.ArrowCursor)
-            self._btn_detectar.setEnabled(True)
+        if hasattr(self, "_thread_deteccao") and self._thread_deteccao is not None and self._thread_deteccao.isRunning():
+            return
 
-            # Garante que o rótulo não fique preso em "Analisando..."
-            if "Analisando" in self._rotulo_estatisticas.text():
-                self._atualizar_estatisticas()
+        confianca = self._slider_confianca.value()
+        mostrar_boxes = self._checkbox_boxes.isChecked()
+
+        self._thread_deteccao = QThread(self)
+        self._worker_deteccao = _DetectorFogoWorker(
+            self,
+            self.imagem_original.copy(),
+            confianca,
+            mostrar_boxes,
+        )
+        self._worker_deteccao.moveToThread(self._thread_deteccao)
+
+        self._thread_deteccao.started.connect(self._worker_deteccao.run)
+        self._worker_deteccao.concluido.connect(self._ao_deteccao_concluida)
+        self._worker_deteccao.falha.connect(self._ao_deteccao_falhou)
+        self._worker_deteccao.concluido.connect(self._finalizar_deteccao)
+        self._worker_deteccao.falha.connect(self._finalizar_deteccao)
+        self._worker_deteccao.concluido.connect(self._thread_deteccao.quit)
+        self._worker_deteccao.falha.connect(self._thread_deteccao.quit)
+        self._thread_deteccao.finished.connect(self._limpar_thread_deteccao)
+
+        self._thread_deteccao.start()
+
+    def _ao_deteccao_concluida(self, imagem_processada: np.ndarray, contagem: int, confianca_media: float) -> None:
+        """Atualiza interface quando a detecção assíncrona conclui com sucesso."""
+        self._ultima_imagem_processada = imagem_processada
+        self._ultima_contagem = contagem
+        self._ultima_confianca_media = confianca_media
+        self._atualizar_estatisticas()
+        self.preview_requested.emit(imagem_processada)
+
+    def _ao_deteccao_falhou(self, mensagem: str) -> None:
+        """Exibe erro de detecção assíncrona sem travar a interface."""
+        self._ultima_contagem = 0
+        self._ultima_confianca_media = 0.0
+        self._atualizar_estatisticas()
+        QMessageBox.critical(self, "Erro na detecção", mensagem)
+
+    def _finalizar_deteccao(self, *args) -> None:
+        """Restaura o estado da interface ao final da detecção."""
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        self._btn_detectar.setEnabled(True)
+        self._btn_aplicar.setEnabled(True)
+
+        if "Analisando" in self._rotulo_estatisticas.text():
+            self._atualizar_estatisticas()
+
+    def _limpar_thread_deteccao(self) -> None:
+        """Libera referências de thread/worker após conclusão."""
+        if hasattr(self, "_worker_deteccao") and self._worker_deteccao is not None:
+            self._worker_deteccao.deleteLater()
+        if hasattr(self, "_thread_deteccao") and self._thread_deteccao is not None:
+            self._thread_deteccao.deleteLater()
+        self._worker_deteccao = None
+        self._thread_deteccao = None
 
     def _ao_aplicar(self) -> None:
         """Emite o sinal de confirmação e fecha o diálogo."""
+        if hasattr(self, "_thread_deteccao") and self._thread_deteccao is not None and self._thread_deteccao.isRunning():
+            QMessageBox.information(self, "Aguarde", "A detecção ainda está em andamento.")
+            return
         if self._ultima_imagem_processada is None:
             self._ao_detectar()
         if self._ultima_imagem_processada is not None:
