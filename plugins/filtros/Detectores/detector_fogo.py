@@ -6,8 +6,8 @@ Plugin para detecção de fogo e fumaça em imagens utilizando a API do Roboflow
 Funcionalidades
 ---------------
 * Detecta fogo e fumaça em imagens usando modelo pré-treinado (Roboflow Universe).
-* Desenha bounding boxes e exibe contagem de detecções e confiança média.
-* Permite mostrar ou ocultar bounding boxes.
+* Desenha caixas delimitadoras e exibe contagem de detecções e confiança média.
+* Permite mostrar ou ocultar caixas delimitadoras.
 * Integração com a interface do Studio de Processamento de Imagens.
 """
 
@@ -43,7 +43,7 @@ class DetectorFogo(PluginBase):
 
     Esta classe implementa um plugin que detecta fogo e fumaça em imagens,
     utilizando um modelo YOLOv8 hospedado no Roboflow Universe. O plugin
-    permite visualizar as detecções, exibir bounding boxes e aplicar o filtro
+    permite visualizar as detecções, exibir caixas delimitadoras e aplicar o filtro
     à imagem principal do Studio.
     """
 
@@ -69,7 +69,7 @@ class DetectorFogo(PluginBase):
 
         Controles:
         - Slider para confiança mínima
-        - Checkbox para mostrar bounding boxes
+        - Checkbox para mostrar caixas delimitadoras
         - Rótulo de estatísticas
         - Botões Detectar, Aplicar e Cancelar
         """
@@ -92,8 +92,8 @@ class DetectorFogo(PluginBase):
 
         self._slider_confianca.valueChanged.connect(self._atualizar_valor_confianca)
 
-        # --- Checkbox para mostrar bounding boxes ---
-        self._checkbox_boxes = QCheckBox("Mostrar bounding boxes", self)
+        # --- Checkbox para mostrar caixas delimitadoras ---
+        self._checkbox_boxes = QCheckBox("Mostrar caixas delimitadoras", self)
         self._checkbox_boxes.setChecked(True)
         layout_principal.addWidget(self._checkbox_boxes)
 
@@ -173,7 +173,7 @@ class DetectorFogo(PluginBase):
         Retorna
         -------
         np.ndarray
-            Imagem com bounding boxes desenhados (se habilitado).
+            Imagem com caixas delimitadoras desenhadas (se habilitado).
         """
 
         # Validação da imagem de entrada
@@ -186,7 +186,24 @@ class DetectorFogo(PluginBase):
         temp_path = None
         try:
             # Carrega o modelo Roboflow em cache
-            modelo = self._carregar_modelo(self._API_KEY)
+            try:
+                modelo = self._carregar_modelo(self._API_KEY)
+            except ModuleNotFoundError as e:
+                if e.name == "roboflow":
+                    logging.error("Dependência 'roboflow' não encontrada no ambiente.")
+                    QMessageBox.critical(
+                        self,
+                        "Dependência ausente",
+                        "A biblioteca 'roboflow' não está instalada.\n\n"
+                        "Instale com: pip install -r requirements.txt",
+                    )
+                    return imagem.copy()
+                raise
+            except Exception as e:
+                logging.error(f"Erro ao carregar modelo Roboflow: {e}")
+                QMessageBox.critical(self, "Erro na detecção", f"Erro ao carregar modelo Roboflow:\n\n{e}")
+                return imagem.copy()
+
             confianca = self._slider_confianca.value()
 
             # Salva imagem temporária para enviar à API
@@ -196,7 +213,14 @@ class DetectorFogo(PluginBase):
                 with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
                     temp_path = tmp.name
                     imagem_bgr = cv2.cvtColor(imagem, cv2.COLOR_RGB2BGR)
-                    cv2.imwrite(temp_path, imagem_bgr)
+                    if not cv2.imwrite(temp_path, imagem_bgr):
+                        logging.error(f"Falha ao gravar imagem temporária em disco: {temp_path}")
+                        QMessageBox.critical(
+                            self,
+                            "Erro",
+                            "Falha ao gravar imagem temporária para detecção de fogo.",
+                        )
+                        return imagem.copy()
             except Exception as e:
                 logging.error(f"Erro ao salvar imagem temporária: {e}")
                 QMessageBox.critical(self, "Erro", f"Erro ao salvar imagem temporária: {e}")
@@ -236,7 +260,7 @@ class DetectorFogo(PluginBase):
 
         for pred in predicoes:
             try:
-                # Processa e desenha cada bounding box
+                # Processa e desenha cada caixa delimitadora
                 x_center = pred['x']
                 y_center = pred['y']
                 width = pred['width']
@@ -289,7 +313,7 @@ class DetectorFogo(PluginBase):
                         cv2.LINE_AA,
                     )
             except Exception as e:
-                logging.error(f"Erro ao processar bounding box: {e} | pred: {pred}")
+                logging.error(f"Erro ao processar caixa delimitadora: {e} | pred: {pred}")
 
         # Atualiza estatísticas de detecção
         self._ultima_contagem = contagem
@@ -321,7 +345,7 @@ class DetectorFogo(PluginBase):
     # Slots privados
     # ------------------------------------------------------------------
 
-    def _ao_alterar_checkbox(self) -> None:
+    def _ao_alterar_checkbox(self, _estado: int | None = None) -> None:
         """Reprocessa a imagem quando checkbox é alterado."""
         if self._ultima_imagem_processada is not None:
             self._ao_detectar()
@@ -344,10 +368,17 @@ class DetectorFogo(PluginBase):
             imagem_processada = self.processar(self.imagem_original)
             self._ultima_imagem_processada = imagem_processada
             self.preview_requested.emit(imagem_processada)
+        except Exception as e:
+            logging.error(f"Erro inesperado ao detectar fogo e fumaça: {e}")
+            QMessageBox.critical(self, "Erro na detecção", f"Erro inesperado:\n\n{e}")
         finally:
             # Restaurar cursor e botão
             self.setCursor(Qt.CursorShape.ArrowCursor)
             self._btn_detectar.setEnabled(True)
+
+            # Garante que o rótulo não fique preso em "Analisando..."
+            if "Analisando" in self._rotulo_estatisticas.text():
+                self._atualizar_estatisticas()
 
     def _ao_aplicar(self) -> None:
         """Emite o sinal de confirmação e fecha o diálogo."""
