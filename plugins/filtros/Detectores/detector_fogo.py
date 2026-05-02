@@ -94,7 +94,11 @@ class DetectorFogo(PluginBase):
     """
 
     def closeEvent(self, event):
-        """Marca flag de cancelamento ao fechar o diálogo."""
+        """Impede fechar o diálogo se a detecção estiver em andamento, senão marca flag de cancelamento."""
+        if hasattr(self, "_thread_deteccao") and self._thread_deteccao is not None and self._thread_deteccao.isRunning():
+            QMessageBox.information(self, "Aguarde", "A detecção ainda está em andamento. Aguarde a conclusão para fechar.")
+            event.ignore()
+            return
         self._fechado = True
         super().closeEvent(event)
 
@@ -409,9 +413,75 @@ class DetectorFogo(PluginBase):
     # ------------------------------------------------------------------
 
     def _ao_alterar_checkbox(self, _estado: int | None = None) -> None:
-        """Reprocessa a imagem quando checkbox é alterado."""
-        if self._ultima_imagem_processada is not None:
-            self._ao_detectar()
+        """Redesenha as caixas delimitadoras sem nova chamada à API."""
+        if self._ultima_imagem_processada is not None and hasattr(self, '_ultima_predicoes') and self._ultima_predicoes is not None:
+            # Redesenhar caixas na última imagem base
+            mostrar_boxes = self._checkbox_boxes.isChecked()
+            imagem_base = self.imagem_original.copy() if hasattr(self, 'imagem_original') else self._ultima_imagem_processada.copy()
+            imagem_resultado = self._desenhar_caixas(imagem_base, self._ultima_predicoes, mostrar_boxes)
+            self.preview_requested.emit(imagem_resultado)
+        elif self._ultima_imagem_processada is not None:
+            # fallback: só mostra a última imagem processada
+            self.preview_requested.emit(self._ultima_imagem_processada)
+        else:
+            # Se não há imagem, não faz nada
+            pass
+
+    def _desenhar_caixas(self, imagem: np.ndarray, predicoes: list, mostrar_boxes: bool) -> np.ndarray:
+        """Desenha ou oculta as caixas delimitadoras na imagem conforme o estado do checkbox."""
+        imagem_resultado = imagem.copy()
+        for pred in predicoes:
+            try:
+                x_center = pred['x']
+                y_center = pred['y']
+                width = pred['width']
+                height = pred['height']
+                x1 = int(x_center - width / 2)
+                y1 = int(y_center - height / 2)
+                x2 = int(x_center + width / 2)
+                y2 = int(y_center + height / 2)
+                conf = pred['confidence']
+                classe_original = pred.get('class', 'fire')
+                nome_classe = self._CLASSE_LABEL_PTBR.get(classe_original.lower(), classe_original.capitalize())
+                if mostrar_boxes:
+                    cor = (128, 128, 128) if classe_original.lower() == 'smoke' else (255, 100, 0)
+                    cv2.rectangle(imagem_resultado, (x1, y1), (x2, y2), cor, 3)
+                    label = f"{nome_classe}: {conf:.1%}"
+                    tamanho_fonte = 0.55
+                    espessura = 1
+                    (largura_texto, altura_texto), baseline = cv2.getTextSize(
+                        label, cv2.FONT_HERSHEY_SIMPLEX, tamanho_fonte, espessura
+                    )
+                    padding = 4
+                    altura_label = altura_texto + baseline + padding * 2
+                    if y1 - altura_label >= 0:
+                        label_y1 = y1 - altura_label
+                        label_y2 = y1
+                        texto_y = y1 - padding - baseline
+                    else:
+                        label_y1 = y1
+                        label_y2 = y1 + altura_label
+                        texto_y = y1 + altura_texto + padding
+                    cv2.rectangle(
+                        imagem_resultado,
+                        (x1, label_y1),
+                        (x1 + largura_texto + padding * 2, label_y2),
+                        cor,
+                        -1,
+                    )
+                    cv2.putText(
+                        imagem_resultado,
+                        label,
+                        (x1 + padding, texto_y),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        tamanho_fonte,
+                        (255, 255, 255),
+                        espessura,
+                        cv2.LINE_AA,
+                    )
+            except Exception as e:
+                _LOGGER.error(f"Erro ao processar caixa delimitadora: {e} | pred: {pred}")
+        return imagem_resultado
 
 
     def _ao_detectar(self) -> None:
@@ -443,62 +513,63 @@ class DetectorFogo(PluginBase):
             confianca,
             mostrar_boxes,
         )
-        self._worker_deteccao.moveToThread(self._thread_deteccao)
+        def _processar_deteccao(
+            self,
+            imagem: np.ndarray,
+            confianca: int,
+            mostrar_boxes: bool,
+        ) -> tuple[np.ndarray, int, float]:
+            """Executa a detecção e retorna imagem processada e métricas."""
 
-        self._thread_deteccao.started.connect(self._worker_deteccao.run)
-        self._worker_deteccao.concluido.connect(self._ao_deteccao_concluida)
-        self._worker_deteccao.falha.connect(self._ao_deteccao_falhou)
-        self._worker_deteccao.concluido.connect(self._finalizar_deteccao)
-        self._worker_deteccao.falha.connect(self._finalizar_deteccao)
-        self._worker_deteccao.concluido.connect(self._thread_deteccao.quit)
-        self._worker_deteccao.falha.connect(self._thread_deteccao.quit)
-        self._thread_deteccao.finished.connect(self._limpar_thread_deteccao)
+            if not isinstance(imagem, np.ndarray) or imagem.ndim != 3 or imagem.shape[2] != 3:
+                raise ValueError("Imagem de entrada inválida para detecção de fogo.")
 
-        self._thread_deteccao.start()
+            temp_path = None
+            try:
+                try:
+                    modelo = self._carregar_modelo(self._API_KEY)
+                except ModuleNotFoundError as e:
+                    if e.name == "roboflow":
+                        raise RuntimeError(
+                            "A biblioteca 'roboflow' não está instalada. "
+                            "Instale com: pip install -r requirements.txt"
+                        ) from e
+                    raise
+                except Exception as e:
+                    raise RuntimeError(f"Erro ao carregar modelo Roboflow: {e}") from e
 
-    def _ao_deteccao_concluida(self, imagem_processada: np.ndarray, contagem: int, confianca_media: float) -> None:
-        """Atualiza interface quando a detecção assíncrona conclui com sucesso."""
-        if hasattr(self, '_fechado') and self._fechado:
-            _LOGGER.info("Resultado da thread ignorado: diálogo já foi fechado.")
-            return
-        self._ultima_imagem_processada = imagem_processada
-        self._ultima_contagem = contagem
-        self._ultima_confianca_media = confianca_media
-        self._atualizar_estatisticas()
-        self.preview_requested.emit(imagem_processada)
+                import tempfile
 
-    def _ao_deteccao_falhou(self, mensagem: str) -> None:
-        """Exibe erro de detecção assíncrona sem travar a interface."""
-        self._ultima_contagem = 0
-        self._ultima_confianca_media = 0.0
-        self._atualizar_estatisticas()
-        QMessageBox.critical(self, "Erro na detecção", mensagem)
+                try:
+                    with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
+                        temp_path = tmp.name
+                        imagem_bgr = cv2.cvtColor(imagem, cv2.COLOR_RGB2BGR)
+                        if not cv2.imwrite(temp_path, imagem_bgr):
+                            raise RuntimeError("Falha ao gravar imagem temporária para detecção de fogo.")
+                except Exception as e:
+                    raise RuntimeError(f"Erro ao salvar imagem temporária: {e}") from e
 
-    def _finalizar_deteccao(self, *args) -> None:
-        """Restaura o estado da interface ao final da detecção."""
-        self.setCursor(Qt.CursorShape.ArrowCursor)
-        self._btn_detectar.setEnabled(True)
-        self._btn_aplicar.setEnabled(True)
+                try:
+                    resultado = modelo.predict(temp_path, confidence=confianca).json()
+                except Exception as e:
+                    raise RuntimeError(f"Erro ao conectar com a API do Roboflow: {e}") from e
 
-        if "Analisando" in self._rotulo_estatisticas.text():
-            self._atualizar_estatisticas()
+                import json
 
-    def _limpar_thread_deteccao(self) -> None:
-        """Libera referências de thread/worker após conclusão."""
-        if hasattr(self, "_worker_deteccao") and self._worker_deteccao is not None:
-            self._worker_deteccao.deleteLater()
-        if hasattr(self, "_thread_deteccao") and self._thread_deteccao is not None:
-            self._thread_deteccao.deleteLater()
-        self._worker_deteccao = None
-        self._thread_deteccao = None
+                _LOGGER.warning(f"Resultado bruto da API Roboflow: {json.dumps(resultado, indent=2, ensure_ascii=False)}")
+                if not isinstance(resultado, dict) or 'predictions' not in resultado or not isinstance(resultado['predictions'], list):
+                    raise RuntimeError("Resposta inesperada da API do Roboflow.")
 
-    def _ao_aplicar(self) -> None:
-        """Emite o sinal de confirmação e fecha o diálogo."""
-        if hasattr(self, "_thread_deteccao") and self._thread_deteccao is not None and self._thread_deteccao.isRunning():
-            QMessageBox.information(self, "Aguarde", "A detecção ainda está em andamento.")
-            return
-        if self._ultima_imagem_processada is None:
-            QMessageBox.information(self, "Detecção necessária", "Execute a detecção e aguarde a conclusão antes de aplicar.")
-            return
-        self.apply_requested.emit(self._ultima_imagem_processada)
-        self.accept()
+            finally:
+                if temp_path and os.path.exists(temp_path):
+                    try:
+                        os.unlink(temp_path)
+                    except Exception as e:
+                        _LOGGER.error(f"Erro ao remover arquivo temporário: {e}")
+
+            predicoes = resultado.get('predictions', [])
+            self._ultima_predicoes = predicoes  # Salva as predições para alternância local
+            contagem = len(predicoes)
+            confidencias = [pred['confidence'] for pred in predicoes]
+            imagem_resultado = self._desenhar_caixas(imagem, predicoes, mostrar_boxes)
+            return imagem_resultado, contagem, sum(confidencias) / len(confidencias) if confidencias else 0.0
