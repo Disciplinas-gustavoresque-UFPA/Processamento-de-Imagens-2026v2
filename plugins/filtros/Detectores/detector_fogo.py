@@ -83,6 +83,26 @@ class _DetectorFogoWorker(QObject):
 
 
 class DetectorFogo(PluginBase):
+    def closeEvent(self, event):
+        """Marca flag de cancelamento ao fechar o diálogo."""
+        self._fechado = True
+        super().closeEvent(event)
+
+    def showEvent(self, event):
+        """Reseta flag de cancelamento ao abrir o diálogo."""
+        self._fechado = False
+        super().showEvent(event)
+
+    def _resetar_estado_cancelamento(self):
+        """Garante que a flag _fechado está False ao iniciar nova detecção."""
+        self._fechado = False
+
+    def reject(self) -> None:
+        """Impede fechar o diálogo se a detecção estiver em andamento."""
+        if hasattr(self, "_thread_deteccao") and self._thread_deteccao is not None and self._thread_deteccao.isRunning():
+            QMessageBox.information(self, "Aguarde", "A detecção ainda está em andamento. Aguarde a conclusão para cancelar.")
+            return
+        super().reject()
     """
     Plugin para detecção de fogo em imagens usando a API do Roboflow.
 
@@ -392,6 +412,7 @@ class DetectorFogo(PluginBase):
             self._ao_detectar()
 
     def _ao_detectar(self) -> None:
+        self._resetar_estado_cancelamento()
         """Executa a detecção e emite o sinal de pré-visualização."""
         # Mostrar mensagem de processamento com cursor de espera
         self._rotulo_estatisticas.setText("⏳ Analisando a imagem... Aguarde")
@@ -434,6 +455,9 @@ class DetectorFogo(PluginBase):
 
     def _ao_deteccao_concluida(self, imagem_processada: np.ndarray, contagem: int, confianca_media: float) -> None:
         """Atualiza interface quando a detecção assíncrona conclui com sucesso."""
+        if hasattr(self, '_fechado') and self._fechado:
+            _LOGGER.info("Resultado da thread ignorado: diálogo já foi fechado.")
+            return
         self._ultima_imagem_processada = imagem_processada
         self._ultima_contagem = contagem
         self._ultima_confianca_media = confianca_media
