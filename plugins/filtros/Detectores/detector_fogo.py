@@ -28,14 +28,20 @@ from PySide6.QtWidgets import (
 
 # Configuração de logger dedicada ao plugin (sem alterar logger global da aplicação)
 # O arquivo é gravado em diretório de dados do usuário para evitar problemas de permissão.
+
+# Inicialização robusta do logger: fallback para StreamHandler se houver erro de permissão/IO
 _BASE_DADOS_USUARIO = os.getenv('APPDATA') or os.path.join(os.path.expanduser('~'), '.local', 'share')
 _DIR_LOG = os.path.join(_BASE_DADOS_USUARIO, 'Processamento-de-Imagens-2026v2', 'logs')
-os.makedirs(_DIR_LOG, exist_ok=True)
 _LOG_PATH = os.path.join(_DIR_LOG, 'detector_fogo.log')
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.WARNING)
 if not _LOGGER.handlers:
-    _handler = logging.FileHandler(_LOG_PATH, encoding='utf-8')
+    try:
+        os.makedirs(_DIR_LOG, exist_ok=True)
+        _handler = logging.FileHandler(_LOG_PATH, encoding='utf-8')
+    except Exception as e:
+        _handler = logging.StreamHandler()
+        _LOGGER.warning(f"Falha ao criar FileHandler para log do plugin: {e}. Usando StreamHandler.")
     _handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
     _LOGGER.addHandler(_handler)
 _LOGGER.propagate = False
@@ -97,6 +103,12 @@ class DetectorFogo(PluginBase):
     _PROJECT = "fire-fhsxx"
     _VERSION = 2
     _API_KEY = "NZYJNuZfV3bJDCpXyYMH"
+
+    # Mapeamento de classes para rótulo em pt-BR
+    _CLASSE_LABEL_PTBR = {
+        "fire": "Fogo",
+        "smoke": "Fumaça"
+    }
 
     # ------------------------------------------------------------------
     # Interface (setup_ui)
@@ -272,7 +284,8 @@ class DetectorFogo(PluginBase):
                 conf = pred['confidence']
                 confidencias.append(conf)
                 classe_original = pred.get('class', 'fire')
-                nome_classe = classe_original.capitalize()
+                # Traduzir rótulo para pt-BR se possível
+                nome_classe = self._CLASSE_LABEL_PTBR.get(classe_original.lower(), classe_original.capitalize())
                 if mostrar_boxes:
                     if classe_original.lower() == 'smoke':
                         cor = (128, 128, 128)
@@ -458,7 +471,7 @@ class DetectorFogo(PluginBase):
             QMessageBox.information(self, "Aguarde", "A detecção ainda está em andamento.")
             return
         if self._ultima_imagem_processada is None:
-            self._ao_detectar()
-        if self._ultima_imagem_processada is not None:
-            self.apply_requested.emit(self._ultima_imagem_processada)
-            self.accept()
+            QMessageBox.information(self, "Detecção necessária", "Execute a detecção e aguarde a conclusão antes de aplicar.")
+            return
+        self.apply_requested.emit(self._ultima_imagem_processada)
+        self.accept()
