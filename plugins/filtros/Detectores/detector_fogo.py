@@ -82,7 +82,17 @@ class _DetectorFogoWorker(QObject):
             self.falha.emit(str(e))
 
 
+
 class DetectorFogo(PluginBase):
+    """
+    Plugin para detecção de fogo em imagens usando a API do Roboflow.
+
+    Esta classe implementa um plugin que detecta fogo e fumaça em imagens,
+    utilizando um modelo YOLOv8 hospedado no Roboflow Universe. O plugin
+    permite visualizar as detecções, exibir caixas delimitadoras e aplicar o filtro
+    à imagem principal do Studio.
+    """
+
     def closeEvent(self, event):
         """Marca flag de cancelamento ao fechar o diálogo."""
         self._fechado = True
@@ -103,14 +113,6 @@ class DetectorFogo(PluginBase):
             QMessageBox.information(self, "Aguarde", "A detecção ainda está em andamento. Aguarde a conclusão para cancelar.")
             return
         super().reject()
-    """
-    Plugin para detecção de fogo em imagens usando a API do Roboflow.
-
-    Esta classe implementa um plugin que detecta fogo e fumaça em imagens,
-    utilizando um modelo YOLOv8 hospedado no Roboflow Universe. O plugin
-    permite visualizar as detecções, exibir caixas delimitadoras e aplicar o filtro
-    à imagem principal do Studio.
-    """
 
     display_name = "Detector de Fogo e Fumaça"
 
@@ -411,9 +413,10 @@ class DetectorFogo(PluginBase):
         if self._ultima_imagem_processada is not None:
             self._ao_detectar()
 
+
     def _ao_detectar(self) -> None:
-        self._resetar_estado_cancelamento()
         """Executa a detecção e emite o sinal de pré-visualização."""
+        self._resetar_estado_cancelamento()
         # Mostrar mensagem de processamento com cursor de espera
         self._rotulo_estatisticas.setText("⏳ Analisando a imagem... Aguarde")
         self._rotulo_estatisticas.setStyleSheet(
