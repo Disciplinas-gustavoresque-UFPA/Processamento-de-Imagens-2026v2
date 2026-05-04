@@ -38,58 +38,11 @@ class VisualizadorImagem(QScrollArea):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.viewport().setStyleSheet("background-color: #1e1e1e;")
-        self.setStyleSheet(
-            """
-            QScrollArea {
-                background-color: #1e1e1e;
-                border: none;
-            }
-
-            QScrollBar:horizontal {
-                height: 12px;
-                background: #1e1e1e;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar:vertical {
-                width: 12px;
-                background: #1e1e1e;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar::handle:horizontal,
-            QScrollBar::handle:vertical {
-                background: #3c3c3c;
-                border-radius: 5px;
-                min-width: 30px;
-                min-height: 30px;
-            }
-
-            QScrollBar::handle:horizontal:hover,
-            QScrollBar::handle:vertical:hover {
-                background: #4c4c4c;
-            }
-
-            QScrollBar::add-line:horizontal,
-            QScrollBar::sub-line:horizontal,
-            QScrollBar::add-line:vertical,
-            QScrollBar::sub-line:vertical {
-                width: 0px;
-                height: 0px;
-                background: none;
-                border: none;
-            }
-
-            QScrollBar::add-page:horizontal,
-            QScrollBar::sub-page:horizontal,
-            QScrollBar::add-page:vertical,
-            QScrollBar::sub-page:vertical {
-                background: #1e1e1e;
-            }
-            """
-        )
+        
+        # Carrega estilo QSS do arquivo
+        caminho_qss = Path(__file__).parent / "zoom.qss"
+        if caminho_qss.exists():
+            self.setStyleSheet(caminho_qss.read_text(encoding="utf-8"))
 
         self._pixmap_original: QPixmap | None = None
         self._zoom = 1.0
