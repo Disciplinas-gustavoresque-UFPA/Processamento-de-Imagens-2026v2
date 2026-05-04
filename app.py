@@ -47,7 +47,7 @@ if _DIRETORIO_RAIZ not in sys.path:
 
 from core.plugin_base import PluginBase  # noqa: E402  (importação após sys.path)
 from components.zoom import VisualizadorImagem  # noqa: E402
-from layout import LeftToolbar, RightSidebar  # noqa: E402
+from layout import BarraFerramentasEsquerda, BarraLateralDireita  # noqa: E402
 from plugins.pixels.filtro_brilho_contraste import FiltroBrilhoContraste  # noqa: E402
 from plugins.pixels.filtro_escala_de_cinza import FiltroEscalaDeCinza  # noqa: E402
 from plugins.pixels.filtro_saturacao import FiltroSaturacao  # noqa: E402
@@ -320,7 +320,7 @@ class JanelaPrincipal(QMainWindow):
         layout_central.setContentsMargins(0, 0, 0, 0)
         layout_central.setSpacing(0)
 
-        self._toolbar_esquerda = LeftToolbar(container_central)
+        self._toolbar_esquerda = BarraFerramentasEsquerda(container_central)
         self._toolbar_esquerda.ferramenta_alterada.connect(self._ao_ferramenta_alterada)
         self._toolbar_esquerda.modo_zoom_alterado.connect(self._ao_modo_zoom_toolbar_alterado)
         layout_central.addWidget(self._toolbar_esquerda)
@@ -328,7 +328,7 @@ class JanelaPrincipal(QMainWindow):
         self._stacked = QStackedWidget(container_central)
         layout_central.addWidget(self._stacked, 1)
 
-        self._sidebar_direita = RightSidebar(container_central)
+        self._sidebar_direita = BarraLateralDireita(container_central)
         self._sidebar_direita.ajuste_solicitado.connect(self._ao_ajuste_solicitado)
         layout_central.addWidget(self._sidebar_direita)
 
@@ -628,11 +628,10 @@ class JanelaPrincipal(QMainWindow):
             if not hasattr(self, "_imagem_atual") or self._imagem_atual is None:
                 return
             self._abrir_plugin_rotacao_espelhamento()
-            # Volta para a ferramenta anterior após fechar o diálogo
+            # Volta para a ferramenta de mover após fechar o diálogo.
+            # A sincronização ocorre por um único caminho (selecionar_ferramenta_por_nome)
+            # para evitar que o slot de alteração da ferramenta execute em duplicidade.
             self._ferramenta_ativa_toolbar = "mover"
-            # Reaplica o fluxo padrão da ferramenta de mover e sincroniza a toolbar
-            # para manter UI, estado interno e comportamento consistentes.
-            self._ao_ferramenta_alterada("mover")
             self._toolbar_esquerda.selecionar_ferramenta_por_nome("mover")
             return
 
