@@ -11,7 +11,7 @@ from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QFrame, QMenu, QToolButton, QVBoxLayout, QWidget
 
 
-class ZoomToolButton(QToolButton):
+class BotaoZoom(QToolButton):
     """Botão de zoom com submenu no duplo clique e indicador triangular."""
 
     modo_zoom_alterado = Signal(str)
@@ -78,7 +78,7 @@ class ZoomToolButton(QToolButton):
     def paintEvent(self, evento) -> None:
         super().paintEvent(evento)
 
-        # Indicador de submenu no canto inferior direito do botao.
+        # Indicador de submenu no canto inferior direito do botão.
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         painter.setPen(Qt.PenStyle.NoPen)
@@ -95,8 +95,8 @@ class ZoomToolButton(QToolButton):
         painter.end()
 
 
-class LeftToolbar(QFrame):
-    """Widget reutilizavel para a barra lateral esquerda com icones."""
+class BarraFerramentasEsquerda(QFrame):
+    """Widget reutilizável para a barra lateral esquerda com ícones."""
 
     ferramenta_alterada = Signal(str)
     modo_zoom_alterado = Signal(str)
@@ -170,7 +170,7 @@ class LeftToolbar(QFrame):
         return botao
 
     def _criar_botao_zoom(self, pasta_icones: Path, nome: str) -> QToolButton:
-        botao = ZoomToolButton(
+        botao = BotaoZoom(
             pasta_icones,
             self._carregar_icone_branco,
             self._carregar_icone_preto,
@@ -257,17 +257,3 @@ class LeftToolbar(QFrame):
             if nome.lower() == nome_normalizado:
                 self._ativar_somente(indice)
                 break
-
-    def _criar_swatches(self) -> QWidget:
-        container = QWidget(self)
-        container.setFixedSize(28, 28)
-
-        primaria = QFrame(container)
-        primaria.setObjectName("swatchPrimary")
-        primaria.setGeometry(0, 0, 20, 20)
-
-        secundaria = QFrame(container)
-        secundaria.setObjectName("swatchSecondary")
-        secundaria.setGeometry(8, 8, 20, 20)
-
-        return container
