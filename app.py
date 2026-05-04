@@ -221,10 +221,10 @@ class JanelaPrincipal(QMainWindow):
         self.tabs.setTabsClosable(True) # Habilita o botão (X) em cada aba
         
         # Estilo para deixar as abas maiores (para caber a miniatura)
-        self.tabs.setIconSize(QSize(40, 40))
+        self.tabs.setIconSize(QSize(30, 30))
         self.tabs.setStyleSheet("""
             QTabBar { alignment: left; }
-            QTabBar::tab { height: 80px; width: 140px; padding: 5px; font-weight: bold; text-align: left; }
+            QTabBar::tab { height: 30px; width: 50px; padding: 5px;}
             QTabWidget::pane { border-top: 2px solid #C2C7CB; }
         """)
 
@@ -302,17 +302,17 @@ class JanelaPrincipal(QMainWindow):
         qimage = QImage(imagem_rgb.data, largura, altura, canais * largura, QImage.Format.Format_RGB888)
         
         # Cria um pixmap quadrado e escala a imagem para caber
-        pixmap = QPixmap(60, 60)
+        pixmap = QPixmap(40, 40)
         pixmap.fill(Qt.GlobalColor.transparent)
         pixmap_imagem = QPixmap.fromImage(qimage).scaled(
-            60, 60, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+            40, 40, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
         )
         
         # Desenha a miniatura centralizada no ícone
         import PySide6.QtGui as QtGui
         painter = QtGui.QPainter(pixmap)
-        x = (60 - pixmap_imagem.width()) // 2
-        y = (60 - pixmap_imagem.height()) // 2
+        x = (40 - pixmap_imagem.width()) // 2
+        y = (40 - pixmap_imagem.height()) // 2
         painter.drawPixmap(x, y, pixmap_imagem)
         painter.end()
         
