@@ -116,66 +116,6 @@ class AreaArrastarImagem(QLabel):
                 return
 
 
-# ---------------------------------------------------------------------------
-# Widget de arrastar e soltar (drag-and-drop)
-# ---------------------------------------------------------------------------
-
-_EXTENSOES_IMAGEM = (".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif")
-
-
-class AreaArrastarImagem(QLabel):
-    """Área visual onde o usuário pode arrastar e soltar um arquivo de imagem."""
-
-    arquivo_solto = Signal(str)
-
-    _ESTILO_NORMAL = """
-        QLabel {
-            border: 2px dashed #aaa;
-            border-radius: 8px;
-            color: #888;
-            font-size: 14px;
-            background-color: #f9f9f9;
-        }
-    """
-    _ESTILO_HOVER = """
-        QLabel {
-            border: 2px dashed #4a90d9;
-            border-radius: 8px;
-            color: #4a90d9;
-            font-size: 14px;
-            background-color: #e8f0fe;
-        }
-    """
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setAcceptDrops(True)
-        self.setText("Arraste uma imagem aqui")
-        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setFixedSize(420, 120)
-        self.setStyleSheet(self._ESTILO_NORMAL)
-
-    def dragEnterEvent(self, evento):
-        if evento.mimeData().hasUrls():
-            for url in evento.mimeData().urls():
-                if url.toLocalFile().lower().endswith(_EXTENSOES_IMAGEM):
-                    self.setStyleSheet(self._ESTILO_HOVER)
-                    evento.acceptProposedAction()
-                    return
-        evento.ignore()
-
-    def dragLeaveEvent(self, evento):
-        self.setStyleSheet(self._ESTILO_NORMAL)
-        super().dragLeaveEvent(evento)
-
-    def dropEvent(self, evento):
-        self.setStyleSheet(self._ESTILO_NORMAL)
-        for url in evento.mimeData().urls():
-            caminho = url.toLocalFile()
-            if caminho.lower().endswith(_EXTENSOES_IMAGEM):
-                self.arquivo_solto.emit(caminho)
-                return
-
 
 # ---------------------------------------------------------------------------
 # Carregamento dinâmico de plugins
