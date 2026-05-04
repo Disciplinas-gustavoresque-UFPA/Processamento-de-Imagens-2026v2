@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 
-class RightSidebar(QFrame):
+class BarraLateralDireita(QFrame):
     """Widget da barra lateral direita com painel de ajustes."""
 
     ajuste_solicitado = Signal(str)
