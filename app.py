@@ -392,6 +392,7 @@ class JanelaPrincipal(QMainWindow):
         sucesso = cv2.imwrite(caminho, aba_atual.imagem_atual)
 
         if sucesso:
+            aba_atual.caminho = caminho
             self.statusBar().showMessage(f"Imagem salva em: {caminho}")
             # Atualiza a miniatura caso o usuário tenha salvo após aplicar um filtro
             self.tabs.setTabIcon(self.tabs.currentIndex(), self._gerar_icone_miniatura(aba_atual.imagem_atual))
