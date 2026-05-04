@@ -225,7 +225,7 @@ class JanelaPrincipal(QMainWindow):
         self.tabs.setIconSize(QSize(30, 30))
         self.tabs.setStyleSheet("""
             QTabBar { alignment: left; }
-            QTabBar::tab { height: 40px; width: 65px; padding: 5px; }
+            QTabBar::tab { height: 40px; padding: 5px 10px; }
             QTabWidget::pane { border-top: 2px solid #C2C7CB; }
             QTabBar::close-button { subcontrol-position: right; subcontrol-origin: padding; margin-top: 2px; margin-right: 2px; }
         """)
@@ -292,7 +292,7 @@ class JanelaPrincipal(QMainWindow):
             nome_arquivo = os.path.basename(caminho)
             
             # Adiciona a aba com o ícone (miniatura)
-            indice = self.tabs.addTab(novo_documento, miniatura_icon, "")
+            indice = self.tabs.addTab(novo_documento, miniatura_icon, nome_arquivo)
             self.tabs.setTabToolTip(indice, nome_arquivo)
             self.tabs.setCurrentIndex(indice)
 
@@ -364,11 +364,11 @@ class JanelaPrincipal(QMainWindow):
 
         if modificado:
             # Adiciona o asterisco na aba e avisa no tooltip
-            self.tabs.setTabText(indice, " *")
+            self.tabs.setTabText(indice, f"*{nome_arquivo}")
             self.tabs.setTabToolTip(indice, f"{nome_arquivo} (Não salvo)")
         else:
             # Remove o asterisco e volta o tooltip ao normal
-            self.tabs.setTabText(indice, "")
+            self.tabs.setTabText(indice, nome_arquivo)
             self.tabs.setTabToolTip(indice, nome_arquivo)
 
     def salvar_imagem(self) -> None:
