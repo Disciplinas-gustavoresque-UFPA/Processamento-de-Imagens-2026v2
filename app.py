@@ -302,17 +302,17 @@ class JanelaPrincipal(QMainWindow):
         qimage = QImage(imagem_rgb.data, largura, altura, canais * largura, QImage.Format.Format_RGB888)
         
         # Cria um pixmap quadrado e escala a imagem para caber
-        pixmap = QPixmap(40, 40)
+        pixmap = QPixmap(30, 30)
         pixmap.fill(Qt.GlobalColor.transparent)
         pixmap_imagem = QPixmap.fromImage(qimage).scaled(
-            40, 40, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+            30, 30, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
         )
         
         # Desenha a miniatura centralizada no ícone
         import PySide6.QtGui as QtGui
         painter = QtGui.QPainter(pixmap)
-        x = (40 - pixmap_imagem.width()) // 2
-        y = (40 - pixmap_imagem.height()) // 2
+        x = (30 - pixmap_imagem.width()) // 2
+        y = (30 - pixmap_imagem.height()) // 2
         painter.drawPixmap(x, y, pixmap_imagem)
         painter.end()
         
@@ -326,15 +326,24 @@ class JanelaPrincipal(QMainWindow):
         aba = self.tabs.widget(indice)
         nome_arquivo = os.path.basename(aba.caminho)
 
-        resposta = QMessageBox.warning(
-            self,
-            "Aviso de Fechamento",
-            f"Deseja realmente fechar o arquivo '{nome_arquivo}'?\n\nQualquer modificação não salva será perdida.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
-            QMessageBox.StandardButton.Cancel
-        )
+        # 1. Cria a instância do QMessageBox
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Aviso de Fechamento")
+        msg_box.setText(f"Deseja realmente fechar o arquivo '{nome_arquivo}'?\n\nQualquer modificação não salva será perdida.")
+        msg_box.setIcon(QMessageBox.Icon.Warning)
 
-        if resposta == QMessageBox.StandardButton.Yes:
+        # 2. Adiciona botões com textos personalizados e seus respectivos "papéis" (roles)
+        btn_fechar = msg_box.addButton("Sim, fechar arquivo", QMessageBox.ButtonRole.AcceptRole)
+        btn_cancelar = msg_box.addButton("Não, manter aberto", QMessageBox.ButtonRole.RejectRole)
+
+        # 3. Define qual será o botão padrão (focado quando a janela abrir)
+        msg_box.setDefaultButton(btn_cancelar)
+
+        # 4. Exibe a janela e trava a execução até o usuário responder
+        msg_box.exec()
+
+        # 5. Verifica qual botão foi clicado
+        if msg_box.clickedButton() == btn_fechar:
             self.tabs.removeTab(indice)
             aba.deleteLater() # Libera memória
             self.statusBar().showMessage(f"Arquivo '{nome_arquivo}' fechado.")
