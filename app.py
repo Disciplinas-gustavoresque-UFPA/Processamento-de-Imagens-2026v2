@@ -28,7 +28,6 @@ from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QHBoxLayout,
-    QHBoxLayout,
     QLabel,
     QMainWindow,
     QMenu,
@@ -37,7 +36,6 @@ from PySide6.QtWidgets import (
     QStackedWidget,
     QStatusBar,
     QVBoxLayout,
-    QWidget,
     QWidget,
 )
 
@@ -628,6 +626,9 @@ class JanelaPrincipal(QMainWindow):
             self._abrir_plugin_rotacao_espelhamento()
             # Volta para a ferramenta anterior após fechar o diálogo
             self._ferramenta_ativa_toolbar = "mover"
+            # Reaplica o fluxo padrão da ferramenta de mover para manter
+            # o comportamento do visualizador consistente após fechar o diálogo.
+            self._ao_ferramenta_alterada("mover")
             return
 
         self._visualizador.definir_ferramenta_mao(False)
