@@ -12,7 +12,7 @@ from PySide6.QtWidgets import QFrame, QMenu, QToolButton, QVBoxLayout, QWidget
 
 
 class ZoomToolButton(QToolButton):
-    """Botao de zoom com submenu no duplo clique e indicador triangular."""
+    """Botão de zoom com submenu no duplo clique e indicador triangular."""
 
     modo_zoom_alterado = Signal(str)
 
@@ -32,8 +32,8 @@ class ZoomToolButton(QToolButton):
         self._menu_zoom = QMenu(self)
         self._rotulos_modo = {
             "zoom": "Zoom",
-            "zoom-in": "Zoom In",
-            "zoom-out": "Zoom Out",
+            "zoom-in": "Aumentar zoom",
+            "zoom-out": "Diminuir zoom",
         }
         self._ordem_modos = ["zoom", "zoom-in", "zoom-out"]
         self._definir_modo_zoom("zoom")
@@ -143,10 +143,7 @@ class LeftToolbar(QFrame):
         layout_principal.addSpacing(12)
         layout_principal.addStretch(1)
 
-        # Estado inicial da toolbar.
-        self.ferramenta_alterada.emit("mover")
-
-    def _criar_botao(self, nome: str, caminho_icone: Path, fallback: str) -> QToolButton:
+    def _criar_botao(self, nome: str, caminho_icone: Path | None, fallback: str) -> QToolButton:
         botao = QToolButton(self)
         botao.setObjectName("toolButton")
         botao.setProperty("class", "toolButton")
