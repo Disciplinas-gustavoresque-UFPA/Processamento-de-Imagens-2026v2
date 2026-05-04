@@ -290,7 +290,7 @@ class JanelaPrincipal(QMainWindow):
             nome_arquivo = os.path.basename(caminho)
             
             # Adiciona a aba com o ícone (miniatura) e o título
-            indice = self.tabs.addTab(novo_documento, miniatura_icon, nome_arquivo)
+            indice = self.tabs.addTab(novo_documento, miniatura_icon, "")
             self.tabs.setCurrentIndex(indice)
 
             self.statusBar().showMessage(f"Imagem carregada: {nome_arquivo}")
