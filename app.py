@@ -565,7 +565,7 @@ class JanelaPrincipal(QMainWindow):
 
         if ferramenta == "rotação":
             # Abre o diálogo de rotação e espelhamento
-            if not hasattr(self, "_imagem_atual") or self._imagem_atual is None:
+            if self._imagem_atual is None:
                 return
             self._abrir_plugin_rotacao_espelhamento()
             # Volta para a ferramenta de mover após fechar o diálogo.
