@@ -153,6 +153,7 @@ class DocumentoImagem(QWidget):
         self.caminho = caminho_arquivo
         self.imagem_atual = imagem_bgr
         self.imagem_backup = None
+        self.foi_modificado = False
 
         # Configura o layout específico desta aba
         self.layout_interno = QVBoxLayout(self)
@@ -224,7 +225,7 @@ class JanelaPrincipal(QMainWindow):
         self.tabs.setIconSize(QSize(30, 30))
         self.tabs.setStyleSheet("""
             QTabBar { alignment: left; }
-            QTabBar::tab { height: 40px; width: 50px; padding: 5px; }
+            QTabBar::tab { height: 40px; width: 65px; padding: 5px; }
             QTabWidget::pane { border-top: 2px solid #C2C7CB; }
             QTabBar::close-button { subcontrol-position: right; subcontrol-origin: padding; margin-top: 2px; margin-right: 2px; }
         """)
@@ -352,6 +353,24 @@ class JanelaPrincipal(QMainWindow):
             if self.tabs.count() == 0:
                 self._atualizar_status_vazio()
 
+    def _marcar_como_modificado(self, aba: DocumentoImagem, modificado: bool) -> None:
+        """Atualiza o estado de modificação da aba e a interface visual."""
+        aba.foi_modificado = modificado
+        indice = self.tabs.indexOf(aba)
+        if indice == -1:
+            return
+
+        nome_arquivo = os.path.basename(aba.caminho)
+
+        if modificado:
+            # Adiciona o asterisco na aba e avisa no tooltip
+            self.tabs.setTabText(indice, " *")
+            self.tabs.setTabToolTip(indice, f"{nome_arquivo} (Não salvo)")
+        else:
+            # Remove o asterisco e volta o tooltip ao normal
+            self.tabs.setTabText(indice, "")
+            self.tabs.setTabToolTip(indice, nome_arquivo)
+
     def salvar_imagem(self) -> None:
         """Salva a imagem da aba atual em arquivo."""
         aba_atual = self.tabs.currentWidget()
@@ -375,6 +394,7 @@ class JanelaPrincipal(QMainWindow):
             self.statusBar().showMessage(f"Imagem salva em: {caminho}")
             # Atualiza a miniatura caso o usuário tenha salvo após aplicar um filtro
             self.tabs.setTabIcon(self.tabs.currentIndex(), self._gerar_icone_miniatura(aba_atual.imagem_atual))
+            self._marcar_como_modificado(aba_atual, False)
         else:
             QMessageBox.critical(self, "Erro", "Falha ao salvar a imagem.")
 
@@ -442,6 +462,7 @@ class JanelaPrincipal(QMainWindow):
         if indice_aba != -1:
             self.tabs.setTabIcon(indice_aba, self._gerar_icone_miniatura(imagem_bgr))
             
+        self._marcar_como_modificado(aba, True)
         self.statusBar().showMessage("Filtro aplicado com sucesso.")
 
 # ---------------------------------------------------------------------------
