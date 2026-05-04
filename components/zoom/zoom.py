@@ -39,10 +39,15 @@ class VisualizadorImagem(QScrollArea):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.viewport().setStyleSheet("background-color: #1e1e1e;")
         
-        # Carrega estilo QSS do arquivo
+        # Carrega estilo QSS do arquivo (procura local e faz fallback para layout/styles)
         caminho_qss = Path(__file__).parent / "zoom.qss"
+        if not caminho_qss.exists():
+            caminho_qss = Path(__file__).resolve().parents[2] / "layout" / "styles" / "zoom.qss"
         if caminho_qss.exists():
-            self.setStyleSheet(caminho_qss.read_text(encoding="utf-8"))
+            try:
+                self.setStyleSheet(caminho_qss.read_text(encoding="utf-8"))
+            except Exception:
+                pass
 
         self._pixmap_original: QPixmap | None = None
         self._zoom = 1.0
