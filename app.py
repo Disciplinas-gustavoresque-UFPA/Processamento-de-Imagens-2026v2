@@ -220,12 +220,13 @@ class JanelaPrincipal(QMainWindow):
         """Configura a interface baseada em um QTabWidget central."""
         self.tabs = QTabWidget(self)
         self.tabs.setTabsClosable(True) # Habilita o botão (X) em cada aba
-        
+        self.tabs.setElideMode(Qt.TextElideMode.ElideRight)
+
         # Estilo para deixar as abas maiores (para caber a miniatura)
         self.tabs.setIconSize(QSize(30, 30))
         self.tabs.setStyleSheet("""
             QTabBar { alignment: left; }
-            QTabBar::tab { height: 40px; padding: 5px 10px; }
+            QTabBar::tab { height: 40px; max-width: 120px; padding: 5px 10px; }
             QTabWidget::pane { border-top: 2px solid #C2C7CB; }
             QTabBar::close-button { subcontrol-position: right; subcontrol-origin: padding; margin-top: 2px; margin-right: 2px; }
         """)
