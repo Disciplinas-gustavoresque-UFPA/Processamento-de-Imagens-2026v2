@@ -250,6 +250,15 @@ class LeftToolbar(QFrame):
         nome_ferramenta = self._nomes_ferramenta[indice_ativo].lower()
         self.ferramenta_alterada.emit(nome_ferramenta)
 
+    def selecionar_ferramenta_por_nome(self, nome_ferramenta: str) -> None:
+        """Seleciona programaticamente uma ferramenta pelo nome (ex.: 'mover', 'zoom', 'rotação')."""
+        nome_normalizado = nome_ferramenta.lower()
+        try:
+            indice = self._nomes_ferramenta.index(nome_normalizado)
+            self._ativar_somente(indice)
+        except ValueError:
+            pass  # Nome inválido, ignora
+
     def _criar_swatches(self) -> QWidget:
         container = QWidget(self)
         container.setFixedSize(28, 28)
