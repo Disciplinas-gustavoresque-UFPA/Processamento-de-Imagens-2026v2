@@ -325,7 +325,7 @@ class JanelaPrincipal(QMainWindow):
         self._toolbar_esquerda.modo_zoom_alterado.connect(self._ao_modo_zoom_toolbar_alterado)
         layout_central.addWidget(self._toolbar_esquerda)
 
-        self._stacked = QStackedWidget(self)
+        self._stacked = QStackedWidget(container_central)
         layout_central.addWidget(self._stacked, 1)
 
         self._sidebar_direita = RightSidebar(container_central)
@@ -492,6 +492,8 @@ class JanelaPrincipal(QMainWindow):
         self._atualizar_visibilidade_laterais(True)
         self._stacked.setCurrentIndex(1)
         self._exibir_imagem(imagem_bgr, ajustar_a_janela=True)
+        # Reaplica a ferramenta atual para manter consistência visual/comportamental
+        self._ao_ferramenta_alterada(self._ferramenta_ativa_toolbar)
         self.statusBar().showMessage(f"Imagem carregada: {caminho}")
         
     def salvar_imagem(self) -> None:
@@ -542,6 +544,8 @@ class JanelaPrincipal(QMainWindow):
         self._atualizar_visibilidade_laterais(True)
         self._stacked.setCurrentIndex(1)
         self._exibir_imagem(imagem_bgr, ajustar_a_janela=True)
+        # Reaplica a ferramenta atual para manter consistência visual/comportamental
+        self._ao_ferramenta_alterada(self._ferramenta_ativa_toolbar)
         self.statusBar().showMessage("Imagem colada do clipboard.")
 
     def abrir_plugin(self, classe_plugin: type) -> None:
@@ -626,9 +630,10 @@ class JanelaPrincipal(QMainWindow):
             self._abrir_plugin_rotacao_espelhamento()
             # Volta para a ferramenta anterior após fechar o diálogo
             self._ferramenta_ativa_toolbar = "mover"
-            # Reaplica o fluxo padrão da ferramenta de mover para manter
-            # o comportamento do visualizador consistente após fechar o diálogo.
+            # Reaplica o fluxo padrão da ferramenta de mover e sincroniza a toolbar
+            # para manter UI, estado interno e comportamento consistentes.
             self._ao_ferramenta_alterada("mover")
+            self._toolbar_esquerda.selecionar_ferramenta_por_nome("mover")
             return
 
         self._visualizador.definir_ferramenta_mao(False)
