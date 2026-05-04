@@ -1,0 +1,33 @@
+QFrame#leftToolbar {
+    background-color: #1e1e1e;
+    border-right: 1px solid #1a1a1a;
+}
+
+QToolButton#toolButton {
+    min-width: 40px;
+    max-width: 40px;
+    min-height: 40px;
+    max-height: 40px;
+    border: none;
+    border-radius: 6px;
+    color: #ffffff;
+    background-color: transparent;
+}
+
+QToolButton#toolButton:hover {
+    background-color: #2c2c2c;
+}
+
+QToolButton#toolButton:checked {
+    background-color: #3c3c3c;
+}
+
+QFrame#swatchPrimary {
+    background-color: #000000;
+    border: 2px solid #ffffff;
+}
+
+QFrame#swatchSecondary {
+    background-color: #ffffff;
+    border: 2px solid #606060;
+}
