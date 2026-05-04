@@ -46,8 +46,8 @@ class VisualizadorImagem(QScrollArea):
         if caminho_qss.exists():
             try:
                 self.setStyleSheet(caminho_qss.read_text(encoding="utf-8"))
-            except Exception:
-                pass
+            except (OSError, UnicodeError) as erro:
+                print(f"Falha ao carregar o arquivo de estilo '{caminho_qss}': {erro}")
 
         self._pixmap_original: QPixmap | None = None
         self._zoom = 1.0
