@@ -224,8 +224,9 @@ class JanelaPrincipal(QMainWindow):
         self.tabs.setIconSize(QSize(30, 30))
         self.tabs.setStyleSheet("""
             QTabBar { alignment: left; }
-            QTabBar::tab { height: 30px; width: 50px; padding: 5px;}
+            QTabBar::tab { height: 40px; width: 50px; padding: 5px; }
             QTabWidget::pane { border-top: 2px solid #C2C7CB; }
+            QTabBar::close-button { subcontrol-position: right; subcontrol-origin: padding; margin-top: 2px; margin-right: 2px; }
         """)
 
         # Conecta o sinal de clique no botão de fechar da aba à função de validação
@@ -289,8 +290,9 @@ class JanelaPrincipal(QMainWindow):
             # Pega só o nome do arquivo para colocar na aba (Ex: foto.jpg)
             nome_arquivo = os.path.basename(caminho)
             
-            # Adiciona a aba com o ícone (miniatura) e o título
+            # Adiciona a aba com o ícone (miniatura)
             indice = self.tabs.addTab(novo_documento, miniatura_icon, "")
+            self.tabs.setTabToolTip(indice, nome_arquivo)
             self.tabs.setCurrentIndex(indice)
 
             self.statusBar().showMessage(f"Imagem carregada: {nome_arquivo}")
