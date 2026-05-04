@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QHBoxLayout,
+    QHBoxLayout,
     QLabel,
     QMainWindow,
     QMenu,
@@ -36,6 +37,7 @@ from PySide6.QtWidgets import (
     QStackedWidget,
     QStatusBar,
     QVBoxLayout,
+    QWidget,
     QWidget,
 )
 
@@ -47,6 +49,73 @@ if _DIRETORIO_RAIZ not in sys.path:
 
 from core.plugin_base import PluginBase  # noqa: E402  (importação após sys.path)
 from components.zoom import VisualizadorImagem  # noqa: E402
+from layout import LeftToolbar, RightSidebar  # noqa: E402
+from plugins.pixels.filtro_brilho_contraste import FiltroBrilhoContraste  # noqa: E402
+from plugins.pixels.filtro_escala_de_cinza import FiltroEscalaDeCinza  # noqa: E402
+from plugins.pixels.filtro_saturacao import FiltroSaturacao  # noqa: E402
+from plugins.pixels.salt_pepper_noise import SaltPepperNoise  # noqa: E402
+from plugins.imagem.transformar.transformacoes_geometricas import TransformacoesGeometricas  # noqa: E402
+
+
+# ---------------------------------------------------------------------------
+# Widget de arrastar e soltar (drag-and-drop)
+# ---------------------------------------------------------------------------
+
+_EXTENSOES_IMAGEM = (".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif")
+
+
+class AreaArrastarImagem(QLabel):
+    """Área visual onde o usuário pode arrastar e soltar um arquivo de imagem."""
+
+    arquivo_solto = Signal(str)
+
+    _ESTILO_NORMAL = """
+        QLabel {
+            border: 2px dashed #aaa;
+            border-radius: 8px;
+            color: #888;
+            font-size: 14px;
+            background-color: #f9f9f9;
+        }
+    """
+    _ESTILO_HOVER = """
+        QLabel {
+            border: 2px dashed #4a90d9;
+            border-radius: 8px;
+            color: #4a90d9;
+            font-size: 14px;
+            background-color: #e8f0fe;
+        }
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+        self.setText("Arraste uma imagem aqui")
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setFixedSize(420, 120)
+        self.setStyleSheet(self._ESTILO_NORMAL)
+
+    def dragEnterEvent(self, evento):
+        if evento.mimeData().hasUrls():
+            for url in evento.mimeData().urls():
+                if url.toLocalFile().lower().endswith(_EXTENSOES_IMAGEM):
+                    self.setStyleSheet(self._ESTILO_HOVER)
+                    evento.acceptProposedAction()
+                    return
+        evento.ignore()
+
+    def dragLeaveEvent(self, evento):
+        self.setStyleSheet(self._ESTILO_NORMAL)
+        super().dragLeaveEvent(evento)
+
+    def dropEvent(self, evento):
+        self.setStyleSheet(self._ESTILO_NORMAL)
+        for url in evento.mimeData().urls():
+            caminho = url.toLocalFile()
+            if caminho.lower().endswith(_EXTENSOES_IMAGEM):
+                self.arquivo_solto.emit(caminho)
+                return
 
 
 # ---------------------------------------------------------------------------
@@ -232,6 +301,8 @@ class JanelaPrincipal(QMainWindow):
         super().__init__()
         self.setWindowTitle("Studio de Processamento de Imagens")
         self.resize(900, 650)
+        self._modo_zoom_toolbar = "zoom"
+        self._ferramenta_ativa_toolbar = "mover"
 
         # Estado interno
         self._imagem_atual: np.ndarray | None = None   # BGR (OpenCV)
@@ -245,8 +316,23 @@ class JanelaPrincipal(QMainWindow):
     # ------------------------------------------------------------------
 
     def _construir_interface(self) -> None:
-        """Cria o widget central (área de visualização da imagem)."""
+        """Cria o layout central com toolbar lateral e área de visualização."""
+        container_central = QWidget(self)
+        layout_central = QHBoxLayout(container_central)
+        layout_central.setContentsMargins(0, 0, 0, 0)
+        layout_central.setSpacing(0)
+
+        self._toolbar_esquerda = LeftToolbar(container_central)
+        self._toolbar_esquerda.ferramenta_alterada.connect(self._ao_ferramenta_alterada)
+        self._toolbar_esquerda.modo_zoom_alterado.connect(self._ao_modo_zoom_toolbar_alterado)
+        layout_central.addWidget(self._toolbar_esquerda)
+
         self._stacked = QStackedWidget(self)
+        layout_central.addWidget(self._stacked, 1)
+
+        self._sidebar_direita = RightSidebar(container_central)
+        self._sidebar_direita.ajuste_solicitado.connect(self._ao_ajuste_solicitado)
+        layout_central.addWidget(self._sidebar_direita)
 
         # Página 0: placeholder com botões para quando não há imagem
         self._placeholder = QWidget(self)
@@ -309,7 +395,9 @@ class JanelaPrincipal(QMainWindow):
         self._stacked.addWidget(self._placeholder)
         self._stacked.addWidget(self._visualizador)
         self._stacked.setCurrentIndex(0)
-        self.setCentralWidget(self._stacked)
+        self.setCentralWidget(container_central)
+
+        self._atualizar_visibilidade_laterais(False)
 
         self.setStatusBar(QStatusBar(self))
         self._label_zoom_status = QLabel("Zoom: 100%", self)
@@ -403,6 +491,7 @@ class JanelaPrincipal(QMainWindow):
             return
 
         self._imagem_atual = imagem_bgr
+        self._atualizar_visibilidade_laterais(True)
         self._stacked.setCurrentIndex(1)
         self._exibir_imagem(imagem_bgr, ajustar_a_janela=True)
         self.statusBar().showMessage(f"Imagem carregada: {caminho}")
@@ -452,6 +541,7 @@ class JanelaPrincipal(QMainWindow):
         imagem_bgr = cv2.cvtColor(arr_rgb, cv2.COLOR_RGB2BGR)
 
         self._imagem_atual = imagem_bgr
+        self._atualizar_visibilidade_laterais(True)
         self._stacked.setCurrentIndex(1)
         self._exibir_imagem(imagem_bgr, ajustar_a_janela=True)
         self.statusBar().showMessage("Imagem colada do clipboard.")
@@ -516,6 +606,62 @@ class JanelaPrincipal(QMainWindow):
         """Atualiza o indicador permanente com o nível de zoom atual."""
         nivel_zoom = round(zoom * 100)
         self._label_zoom_status.setText(f"Zoom: {nivel_zoom:.0f}%")
+
+    def _ao_ferramenta_alterada(self, ferramenta: str) -> None:
+        """Aplica o comportamento da ferramenta selecionada na toolbar."""
+        self._ferramenta_ativa_toolbar = ferramenta
+
+        if ferramenta == "mover":
+            self._visualizador.definir_ferramenta_mao(True)
+            self._visualizador.definir_ferramenta_zoom(None)
+            return
+
+        if ferramenta == "zoom":
+            self._visualizador.definir_ferramenta_mao(False)
+            self._visualizador.definir_ferramenta_zoom(self._modo_zoom_toolbar)
+            return
+
+        if ferramenta == "rotação":
+            # Abre o diálogo de rotação e espelhamento
+            if not hasattr(self, "_imagem_atual") or self._imagem_atual is None:
+                return
+            self._abrir_plugin_rotacao_espelhamento()
+            # Volta para a ferramenta anterior após fechar o diálogo
+            self._ferramenta_ativa_toolbar = "mover"
+            return
+
+        self._visualizador.definir_ferramenta_mao(False)
+        self._visualizador.definir_ferramenta_zoom(None)
+
+    def _ao_modo_zoom_toolbar_alterado(self, modo_zoom: str) -> None:
+        """Atualiza o modo de zoom selecionado no submenu do botão de zoom."""
+        self._modo_zoom_toolbar = modo_zoom
+        if self._ferramenta_ativa_toolbar == "zoom":
+            self._visualizador.definir_ferramenta_zoom(modo_zoom)
+
+    def _ao_ajuste_solicitado(self, ajuste: str) -> None:
+        """Abre o plugin correspondente ao ajuste clicado na barra lateral direita."""
+        mapa_ajustes: dict[str, type[PluginBase]] = {
+            "brilho_contraste": FiltroBrilhoContraste,
+            "preto_branco": FiltroEscalaDeCinza,
+            "saturacao": FiltroSaturacao,
+            "ruido_salt_pepper": SaltPepperNoise,
+        }
+
+        classe_plugin = mapa_ajustes.get(ajuste)
+        if classe_plugin is None:
+            return
+
+        self.abrir_plugin(classe_plugin)
+
+    def _abrir_plugin_rotacao_espelhamento(self) -> None:
+        """Abre o diálogo de rotação e espelhamento."""
+        self.abrir_plugin(TransformacoesGeometricas)
+
+    def _atualizar_visibilidade_laterais(self, imagem_ativa: bool) -> None:
+        """Mostra ou oculta as barras laterais conforme a tela ativa."""
+        self._toolbar_esquerda.setVisible(imagem_ativa)
+        self._sidebar_direita.setVisible(imagem_ativa)
 
     def keyPressEvent(self, evento) -> None:
         if evento.key() == Qt.Key.Key_Space and not evento.isAutoRepeat():
