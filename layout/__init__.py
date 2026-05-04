@@ -1,6 +1,6 @@
 """Componentes de layout da aplicação."""
 
-from .left_toolbar import LeftToolbar
-from .right_sidebar import RightSidebar
+from .left_toolbar import BarraFerramentasEsquerda
+from .right_sidebar import BarraLateralDireita
 
-__all__ = ["LeftToolbar", "RightSidebar"]
+__all__ = ["BarraFerramentasEsquerda", "BarraLateralDireita"]
