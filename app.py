@@ -749,7 +749,7 @@ class JanelaPrincipal(QMainWindow):
 
         aba_atual = self.tabs.widget(indice)
         if aba_atual and hasattr(aba_atual, 'visualizador'):
-            zoom_atual = aba_atual.visualizador._fator_zoom
+            zoom_atual = aba_atual.visualizador._zoom
             self._ao_zoom_alterado(zoom_atual)
 
     def keyPressEvent(self, evento) -> None:
