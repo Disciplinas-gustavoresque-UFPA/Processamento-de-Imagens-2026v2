@@ -385,6 +385,8 @@ class JanelaPrincipal(QMainWindow):
         
         # Conecta o sinal de clique no botão de fechar da aba à função de validação
         self.tabs.tabCloseRequested.connect(self._solicitar_fechamento_aba)
+
+        self.tabs.currentChanged.connect(self._atualizar_zoom_ao_trocar_aba)
         
         # Montagem final
         self._stacked.addWidget(self._placeholder)
@@ -494,6 +496,7 @@ class JanelaPrincipal(QMainWindow):
 
         # Instancia o documento com a imagem carregada
         novo_documento = DocumentoImagem(caminho, imagem_bgr)
+        novo_documento.zoom_alterado.connect(self._ao_zoom_alterado)
         
         # Gera a miniatura (Icon) para a aba
         miniatura_icon = self._gerar_icone_miniatura(imagem_bgr)
@@ -646,6 +649,7 @@ class JanelaPrincipal(QMainWindow):
         
         # Instancia o documento de imagem
         novo_documento = DocumentoImagem(caminho_ficticio, imagem_bgr)
+        novo_documento.zoom_alterado.connect(self._ao_zoom_alterado)
         miniatura_icon = self._gerar_icone_miniatura(imagem_bgr)
         
         # Adiciona a aba com o ícone (miniatura)
@@ -736,6 +740,17 @@ class JanelaPrincipal(QMainWindow):
         """Atualiza o indicador permanente com o nível de zoom atual."""
         nivel_zoom = round(zoom * 100)
         self._label_zoom_status.setText(f"Zoom: {nivel_zoom:.0f}%")
+
+    def _atualizar_zoom_ao_trocar_aba(self, indice: int):
+        """Ao trocar de aba, busca o zoom da aba atual e atualiza a barra de status."""
+        if indice == -1: # Nenhuma aba aberta (fechou tudo)
+            self._ao_zoom_alterado(1.0)
+            return
+
+        aba_atual = self.tabs.widget(indice)
+        if aba_atual and hasattr(aba_atual, 'visualizador'):
+            zoom_atual = aba_atual.visualizador._fator_zoom
+            self._ao_zoom_alterado(zoom_atual)
 
     def keyPressEvent(self, evento) -> None:
         """Inicia o modo de arrasto (Barra de Espaço) delegando para a aba atual."""
