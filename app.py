@@ -292,6 +292,59 @@ def _menu_tem_acao_folha(menu: QMenu) -> bool:
             return True
     return False
 
+class TelaBoasVindas(QWidget):
+    """Widget que exibe as opções iniciais (abrir, colar, arrastar)."""
+    def __init__(self, janela_principal: "JanelaPrincipal", parent=None):
+        super().__init__(parent)
+        self.janela = janela_principal
+
+        layout_placeholder = QVBoxLayout(self)
+        layout_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        titulo = QLabel("Studio de Processamento de Imagens")
+        titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        titulo.setStyleSheet("font-size: 22px; font-weight: bold; color: #333;")
+
+        subtitulo = QLabel("Comece abrindo ou arrastando uma imagem")
+        subtitulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitulo.setStyleSheet("font-size: 13px; color: #888;")
+
+        btn_nova = QPushButton("Nova Imagem")
+        btn_nova.setFixedSize(130, 40)
+
+        btn_abrir = QPushButton("Abrir imagem…")
+        btn_abrir.setFixedSize(130, 40)
+        btn_abrir.clicked.connect(self.janela.abrir_imagem)
+
+        btn_colar = QPushButton("Colar do clipboard")
+        btn_colar.setFixedSize(150, 40)
+        btn_colar.clicked.connect(self.janela.colar_imagem_clipboard)
+
+        layout_botoes = QHBoxLayout()
+        layout_botoes.setSpacing(10)
+        layout_botoes.addStretch()
+        layout_botoes.addWidget(btn_nova)
+        layout_botoes.addWidget(btn_abrir)
+        layout_botoes.addWidget(btn_colar)
+        layout_botoes.addStretch()
+
+        separador = QLabel("— ou —")
+        separador.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        separador.setStyleSheet("font-size: 12px; color: #aaa;")
+
+        area_arrastar = AreaArrastarImagem()
+        area_arrastar.arquivo_solto.connect(self.janela._carregar_imagem_do_caminho)
+
+        layout_placeholder.addStretch()
+        layout_placeholder.addWidget(titulo)
+        layout_placeholder.addWidget(subtitulo)
+        layout_placeholder.addSpacing(24)
+        layout_placeholder.addLayout(layout_botoes)
+        layout_placeholder.addSpacing(12)
+        layout_placeholder.addWidget(separador)
+        layout_placeholder.addSpacing(12)
+        layout_placeholder.addWidget(area_arrastar, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout_placeholder.addStretch()
 
 # ---------------------------------------------------------------------------
 # Janela Principal
@@ -316,58 +369,7 @@ class JanelaPrincipal(QMainWindow):
         self._stacked = QStackedWidget(self)
       
         # Página 0: placeholder com botões para quando não há imagem
-        self._placeholder = QWidget(self)
-        layout_placeholder = QVBoxLayout(self._placeholder)
-        layout_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        # Título
-        titulo = QLabel("Studio de Processamento de Imagens")
-        titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        titulo.setStyleSheet("font-size: 22px; font-weight: bold; color: #333;")
-        
-        subtitulo = QLabel("Comece abrindo ou arrastando uma imagem")
-        subtitulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitulo.setStyleSheet("font-size: 13px; color: #888;")
-        
-        # Botões em linha
-        btn_nova = QPushButton("Nova Imagem")
-        btn_nova.setFixedSize(130, 40)
-        
-        btn_abrir = QPushButton("Abrir imagem…")
-        btn_abrir.setFixedSize(130, 40)
-        btn_abrir.clicked.connect(self.abrir_imagem)
-        
-        btn_colar = QPushButton("Colar do clipboard")
-        btn_colar.setFixedSize(150, 40)
-        btn_colar.clicked.connect(self.colar_imagem_clipboard)
-        
-        layout_botoes = QHBoxLayout()
-        layout_botoes.setSpacing(10)
-        layout_botoes.addStretch()
-        layout_botoes.addWidget(btn_nova)
-        layout_botoes.addWidget(btn_abrir)
-        layout_botoes.addWidget(btn_colar)
-        layout_botoes.addStretch()
-        
-        # Separador "ou"
-        separador = QLabel("— ou —")
-        separador.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        separador.setStyleSheet("font-size: 12px; color: #aaa;")
-        
-        # Área de arrastar
-        area_arrastar = AreaArrastarImagem()
-        area_arrastar.arquivo_solto.connect(self._carregar_imagem_do_caminho)
-        
-        layout_placeholder.addStretch()
-        layout_placeholder.addWidget(titulo)
-        layout_placeholder.addWidget(subtitulo)
-        layout_placeholder.addSpacing(24)
-        layout_placeholder.addLayout(layout_botoes)
-        layout_placeholder.addSpacing(12)
-        layout_placeholder.addWidget(separador)
-        layout_placeholder.addSpacing(12)
-        layout_placeholder.addWidget(area_arrastar, alignment=Qt.AlignmentFlag.AlignCenter)
-        layout_placeholder.addStretch()
+        self._placeholder = TelaBoasVindas(self)
         
         # Página 1: abas para múltiplas imagens
         self.tabs = QTabWidget(self)
@@ -383,11 +385,10 @@ class JanelaPrincipal(QMainWindow):
             QTabBar::close-button { subcontrol-position: right; subcontrol-origin: padding; margin-top: 2px; margin-right: 2px; }
         """)
         
+        self.tabs.currentChanged.connect(self._atualizar_zoom_ao_trocar_aba)
         # Conecta o sinal de clique no botão de fechar da aba à função de validação
         self.tabs.tabCloseRequested.connect(self._solicitar_fechamento_aba)
 
-        self.tabs.currentChanged.connect(self._atualizar_zoom_ao_trocar_aba)
-        
         # Montagem final
         self._stacked.addWidget(self._placeholder)
         self._stacked.addWidget(self.tabs)
@@ -408,6 +409,12 @@ class JanelaPrincipal(QMainWindow):
 
         # --- Menu Arquivo ---
         menu_arquivo = barra.addMenu("Arquivo")
+
+        acao_nova_aba = menu_arquivo.addAction("Nova aba em branco")
+        acao_nova_aba.setShortcut("Ctrl+T")
+        acao_nova_aba.triggered.connect(self.abrir_nova_aba)
+        menu_arquivo.addSeparator()
+        
         acao_abrir = menu_arquivo.addAction("Abrir imagem…")
         acao_abrir.triggered.connect(self.abrir_imagem)
 
@@ -505,9 +512,17 @@ class JanelaPrincipal(QMainWindow):
         nome_arquivo = os.path.basename(caminho)
         
         # Adiciona a aba com a miniatura e o nome
-        indice = self.tabs.addTab(novo_documento, miniatura_icon, nome_arquivo)
-        self.tabs.setTabToolTip(indice, nome_arquivo)
-        self.tabs.setCurrentIndex(indice)
+        aba_atual = self.tabs.currentWidget()
+        if isinstance(aba_atual, TelaBoasVindas):
+            indice_insercao = self.tabs.currentIndex()
+            self.tabs.removeTab(indice_insercao)
+            aba_atual.deleteLater()
+            self.tabs.insertTab(indice_insercao, novo_documento, miniatura_icon, nome_arquivo)
+        else:
+            indice_insercao = self.tabs.addTab(novo_documento, miniatura_icon, nome_arquivo)
+            
+        self.tabs.setTabToolTip(indice_insercao, nome_arquivo)
+        self.tabs.setCurrentIndex(indice_insercao)
 
         # Alterna o QStackedWidget para mostrar a página de abas (Página 1)
         self._stacked.setCurrentIndex(1)
@@ -537,12 +552,32 @@ class JanelaPrincipal(QMainWindow):
         
         return QIcon(pixmap)
 
+    def abrir_nova_aba(self) -> None:
+        """Abre uma nova aba em branco contendo as opções iniciais."""
+        nova_aba = TelaBoasVindas(self)
+        indice = self.tabs.addTab(nova_aba, "Nova Aba")
+        self.tabs.setCurrentIndex(indice)
+        self._stacked.setCurrentIndex(1)
+        self.statusBar().showMessage("Nova aba em branco aberta.")
+
     def _solicitar_fechamento_aba(self, indice: int) -> None:
         """Dispara o alerta de fechamento. Se o usuário confirmar, fecha a aba."""
         if indice < 0:
             return
             
         aba = self.tabs.widget(indice)
+
+        # Se for uma aba em branco, fecha direto sem perguntar
+        if isinstance(aba, TelaBoasVindas):
+            self.tabs.removeTab(indice)
+            aba.deleteLater()
+            
+            # Se não houver mais abas abertas, volta para a tela inicial (Página 0)
+            if self.tabs.count() == 0:
+                self._stacked.setCurrentIndex(0)
+                self._atualizar_status_vazio()
+            return
+
         nome_arquivo = os.path.basename(aba.caminho)
 
         # Cria a instância do QMessageBox
@@ -653,9 +688,17 @@ class JanelaPrincipal(QMainWindow):
         miniatura_icon = self._gerar_icone_miniatura(imagem_bgr)
         
         # Adiciona a aba com o ícone (miniatura)
-        indice = self.tabs.addTab(novo_documento, miniatura_icon, nome_arquivo)
-        self.tabs.setTabToolTip(indice, "Imagem colada (Não salva)")
-        self.tabs.setCurrentIndex(indice)
+        aba_atual = self.tabs.currentWidget()
+        if isinstance(aba_atual, TelaBoasVindas):
+            indice_insercao = self.tabs.currentIndex()
+            self.tabs.removeTab(indice_insercao)
+            aba_atual.deleteLater()
+            self.tabs.insertTab(indice_insercao, novo_documento, miniatura_icon, nome_arquivo)
+        else:
+            indice_insercao = self.tabs.addTab(novo_documento, miniatura_icon, nome_arquivo)
+            
+        self.tabs.setTabToolTip(indice_insercao, "Imagem colada (Não salva)")
+        self.tabs.setCurrentIndex(indice_insercao)
 
         # Alterna o QStackedWidget para mostrar a página de abas (Página 1)
         self._stacked.setCurrentIndex(1)
