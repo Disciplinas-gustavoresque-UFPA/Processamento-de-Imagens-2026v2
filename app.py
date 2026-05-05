@@ -218,6 +218,9 @@ class DocumentoImagem(QWidget):
     Representa o estado de uma única imagem aberta no programa.
     Encapsula o canvas, a matriz original e os backups para os plugins.
     """
+    # Cria um sinal para repassar a alteração de zoom para a janela principal
+    zoom_alterado = Signal(float)
+
     def __init__(self, caminho_arquivo: str, imagem_bgr: np.ndarray, parent=None):
         super().__init__(parent)
         self.caminho = caminho_arquivo
@@ -229,43 +232,51 @@ class DocumentoImagem(QWidget):
         self.layout_interno = QVBoxLayout(self)
         self.layout_interno.setContentsMargins(0, 0, 0, 0)
 
-        # Label onde a imagem será exibida
-        self.label_imagem = QLabel()
-        self.label_imagem.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label_imagem.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
-        self.label_imagem.setScaledContents(False)
-
-        # ScrollArea para permitir rolar imagens muito grandes
-        self.area_rolagem = QScrollArea()
-        self.area_rolagem.setWidget(self.label_imagem)
-        self.area_rolagem.setWidgetResizable(True)
-        self.area_rolagem.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.visualizador = VisualizadorImagem(self)
+        self.layout_interno.addWidget(self.visualizador)
         
-        self.layout_interno.addWidget(self.area_rolagem)
-        
-        self.atualizar_visualizacao(self.imagem_atual)
+        # Conecta o sinal interno do visualizador ao sinal da aba
+        self.visualizador.zoom_alterado.connect(self.zoom_alterado.emit)
 
-    def atualizar_visualizacao(self, imagem_bgr: np.ndarray) -> None:
-        """Converte a matriz OpenCV e desenha no QLabel do documento."""
+        # Exibe a imagem logo na criação (ajustando à janela por padrão)
+        self.atualizar_visualizacao(self.imagem_atual, ajustar_a_janela=True)
+
+    def atualizar_visualizacao(self, imagem_bgr: np.ndarray, ajustar_a_janela: bool = False) -> None:
+        """Converte a matriz OpenCV para QPixmap e delega ao componente de visualização."""
         imagem_rgb = cv2.cvtColor(imagem_bgr, cv2.COLOR_BGR2RGB)
         altura, largura, canais = imagem_rgb.shape
         bytes_por_linha = canais * largura
-        qimage = QImage(imagem_rgb.data, largura, altura, bytes_por_linha, QImage.Format.Format_RGB888)
+        
+        qimage = QImage(
+            imagem_rgb.data, 
+            largura, 
+            altura, 
+            bytes_por_linha, 
+            QImage.Format.Format_RGB888
+        )
         pixmap = QPixmap.fromImage(qimage)
 
-        # Ajusta ao tamanho do viewport da ScrollArea
-        tamanho_disponivel = self.area_rolagem.viewport().size()
-        pixmap_escalado = pixmap.scaled(
-            tamanho_disponivel,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        )
-        self.label_imagem.setPixmap(pixmap_escalado)
+        # O visualizador customizado agora cuida do redimensionamento e da exibição
+        self.visualizador.definir_pixmap(pixmap, ajustar_a_janela=ajustar_a_janela)
+
+    # ------------------------------------------------------------------
+    # Delegação de métodos para o VisualizadorImagem
+    # ------------------------------------------------------------------
+    
+    def aumentar_zoom(self):
+        self.visualizador.aumentar_zoom()
+
+    def diminuir_zoom(self):
+        self.visualizador.diminuir_zoom()
         
-    def resizeEvent(self, event):
-        """Garante que a imagem seja redimensionada se a janela mudar de tamanho."""
-        super().resizeEvent(event)
-        self.atualizar_visualizacao(self.imagem_atual)
+    def ajustar_imagem_a_janela(self):
+        self.visualizador.ajustar_imagem_a_janela()
+        
+    def resetar_zoom(self):
+        self.visualizador.resetar_zoom()
+
+    def definir_modo_arrasto(self, ativo: bool):
+        self.visualizador.definir_modo_arrasto(ativo)
 
 def _menu_tem_acao_folha(menu: QMenu) -> bool:
     """
