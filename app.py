@@ -500,6 +500,7 @@ class JanelaPrincipal(QMainWindow):
             frame = dialogo.get_frame()
             if frame is not None:
                 self._imagem_atual = frame
+                self._stacked.setCurrentIndex(1)
                 self._exibir_imagem(self._imagem_atual, ajustar_a_janela=True)
                 self.statusBar().showMessage("Imagem capturada via Live Preview.")
         
