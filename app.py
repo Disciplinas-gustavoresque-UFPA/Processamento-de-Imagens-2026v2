@@ -35,7 +35,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QStackedWidget,
     QStatusBar,
-    QDialog
+    QDialog,
     QVBoxLayout,
     QWidget,
 )
