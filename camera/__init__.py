@@ -1,0 +1,1 @@
+"""Pacote de manipulação de câmera."""
