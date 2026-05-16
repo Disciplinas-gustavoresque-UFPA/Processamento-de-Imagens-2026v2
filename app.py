@@ -24,7 +24,7 @@ import sys
 
 import cv2
 import numpy as np
-from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtCore import Qt, Signal, QSize, QTimer
 from PySide6.QtGui import QImage, QKeySequence, QPixmap, QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -258,6 +258,8 @@ class DocumentoImagem(QWidget):
 
         # O visualizador customizado agora cuida do redimensionamento e da exibição
         self.visualizador.definir_pixmap(pixmap, ajustar_a_janela=ajustar_a_janela)
+        if ajustar_a_janela:
+            QTimer.singleShot(0, self.ajustar_imagem_a_janela)
 
     # ------------------------------------------------------------------
     # Delegação de métodos para o VisualizadorImagem
