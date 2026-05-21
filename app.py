@@ -22,7 +22,7 @@ import sys
 
 import cv2
 import numpy as np
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, qInstallMessageHandler
 from PySide6.QtGui import QImage, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -53,6 +53,32 @@ from plugins.pixels.filtro_escala_de_cinza import FiltroEscalaDeCinza  # noqa: E
 from plugins.pixels.filtro_saturacao import FiltroSaturacao  # noqa: E402
 from plugins.pixels.salt_pepper_noise import SaltPepperNoise  # noqa: E402
 from plugins.imagem.transformar.transformacoes_geometricas import TransformacoesGeometricas  # noqa: E402
+
+
+_HANDLER_MENSAGENS_QT = None
+
+
+def _instalar_filtro_mensagens_qt() -> None:
+    """Suprime warnings do Qt conhecidos por serem ruído no console.
+
+    No Windows, alguns caminhos internos podem chamar `QFont::setPointSize(-1)`
+    (ponto indefinido), gerando um aviso que não afeta a execução do app.
+    Filtramos apenas essa mensagem específica para não esconder outros warnings.
+    """
+
+    global _HANDLER_MENSAGENS_QT
+    if _HANDLER_MENSAGENS_QT is not None:
+        return
+
+    def handler(_tipo, _contexto, mensagem: str) -> None:
+        if mensagem.startswith(
+            "QFont::setPointSize: Point size <= 0 (-1), must be greater than 0"
+        ):
+            return
+        sys.stderr.write(mensagem + "\n")
+
+    _HANDLER_MENSAGENS_QT = handler
+    qInstallMessageHandler(_HANDLER_MENSAGENS_QT)
 
 
 # ---------------------------------------------------------------------------
@@ -651,6 +677,7 @@ class JanelaPrincipal(QMainWindow):
 
 def main() -> None:
     """Inicializa e executa a aplicação."""
+    _instalar_filtro_mensagens_qt()
     app = QApplication(sys.argv)
     app.setApplicationName("Studio de Processamento de Imagens")
     janela = JanelaPrincipal()
