@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
+    QHBoxLayout,
     QLabel,
     QToolButton,
     QVBoxLayout,
@@ -24,7 +25,11 @@ class BarraLateralDireita(QFrame):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("rightSidebar")
-        self.setFixedWidth(280)
+
+        self._largura_expandida = 280
+        self._largura_encolhida = 28
+        self._esta_encolhida = False
+        self.setFixedWidth(self._largura_expandida)
 
         self._aplicar_estilo()
         self._construir_ui()
@@ -39,7 +44,39 @@ class BarraLateralDireita(QFrame):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        layout.addWidget(self._criar_painel_ajustes())
+        # Botão de encolher/expandir no canto superior esquerdo.
+        header = QWidget(self)
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(0)
+
+        self._botao_toggle = QToolButton(header)
+        self._botao_toggle.setObjectName("sidebarToggleButton")
+        self._botao_toggle.setAutoRaise(True)
+        self._botao_toggle.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._botao_toggle.clicked.connect(self._alternar_colapso)
+        header_layout.addWidget(self._botao_toggle)
+        header_layout.addStretch(1)
+
+        layout.addWidget(header)
+
+        self._painel_ajustes = self._criar_painel_ajustes()
+        layout.addWidget(self._painel_ajustes, 1)
+        self._atualizar_botao_toggle()
+
+    def _alternar_colapso(self) -> None:
+        self._esta_encolhida = not self._esta_encolhida
+        self._painel_ajustes.setVisible(not self._esta_encolhida)
+        self.setFixedWidth(self._largura_encolhida if self._esta_encolhida else self._largura_expandida)
+        self._atualizar_botao_toggle()
+
+    def _atualizar_botao_toggle(self) -> None:
+        if self._esta_encolhida:
+            self._botao_toggle.setText("<")
+            self._botao_toggle.setToolTip("Expandir barra lateral")
+        else:
+            self._botao_toggle.setText(">")
+            self._botao_toggle.setToolTip("Encolher barra lateral")
 
     def _criar_painel_ajustes(self) -> QWidget:
         container = QFrame(self)
