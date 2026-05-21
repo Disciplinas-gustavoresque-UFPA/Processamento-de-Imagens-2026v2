@@ -8,7 +8,7 @@ from typing import Callable
 from PySide6.QtCore import QByteArray, QPoint, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap, QPolygon
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtWidgets import QFrame, QMenu, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QMenu, QToolButton, QVBoxLayout, QWidget
 
 
 class BotaoZoom(QToolButton):
@@ -104,7 +104,11 @@ class BarraFerramentasEsquerda(QFrame):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("leftToolbar")
-        self.setFixedWidth(52)
+
+        self._largura_expandida = 52
+        self._largura_encolhida = 28
+        self._esta_encolhida = False
+        self.setFixedWidth(self._largura_expandida)
 
         self._aplicar_estilo()
         self._construir_ui()
@@ -116,8 +120,29 @@ class BarraFerramentasEsquerda(QFrame):
 
     def _construir_ui(self) -> None:
         layout_principal = QVBoxLayout(self)
-        layout_principal.setContentsMargins(6, 8, 6, 8)
-        layout_principal.setSpacing(4)
+        layout_principal.setContentsMargins(0, 0, 0, 0)
+        layout_principal.setSpacing(0)
+
+        # Botão de encolher/expandir no canto superior direito.
+        header = QWidget(self)
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(0)
+
+        header_layout.addStretch(1)
+        self._botao_toggle = QToolButton(header)
+        self._botao_toggle.setObjectName("sidebarToggleButton")
+        self._botao_toggle.setAutoRaise(True)
+        self._botao_toggle.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._botao_toggle.clicked.connect(self._alternar_colapso)
+        header_layout.addWidget(self._botao_toggle)
+
+        layout_principal.addWidget(header)
+
+        self._conteudo = QWidget(self)
+        layout_conteudo = QVBoxLayout(self._conteudo)
+        layout_conteudo.setContentsMargins(6, 8, 6, 8)
+        layout_conteudo.setSpacing(4)
 
         pasta_icones = Path(__file__).parent / "ui" / "icons"
         self._botoes_ferramenta: list[QToolButton] = []
@@ -136,12 +161,29 @@ class BarraFerramentasEsquerda(QFrame):
             botao.setCheckable(True)
             botao.setChecked(indice == 0)
             botao.clicked.connect(lambda _checked, i=indice: self._ativar_somente(i))
-            layout_principal.addWidget(botao, alignment=Qt.AlignmentFlag.AlignHCenter)
+            layout_conteudo.addWidget(botao, alignment=Qt.AlignmentFlag.AlignHCenter)
             self._botoes_ferramenta.append(botao)
             self._nomes_ferramenta.append(nome)
 
-        layout_principal.addSpacing(12)
-        layout_principal.addStretch(1)
+        layout_conteudo.addSpacing(12)
+        layout_conteudo.addStretch(1)
+
+        layout_principal.addWidget(self._conteudo, 1)
+        self._atualizar_botao_toggle()
+
+    def _alternar_colapso(self) -> None:
+        self._esta_encolhida = not self._esta_encolhida
+        self._conteudo.setVisible(not self._esta_encolhida)
+        self.setFixedWidth(self._largura_encolhida if self._esta_encolhida else self._largura_expandida)
+        self._atualizar_botao_toggle()
+
+    def _atualizar_botao_toggle(self) -> None:
+        if self._esta_encolhida:
+            self._botao_toggle.setText(">")
+            self._botao_toggle.setToolTip("Expandir barra lateral")
+        else:
+            self._botao_toggle.setText("<")
+            self._botao_toggle.setToolTip("Encolher barra lateral")
 
     def _criar_botao(self, nome: str, caminho_icone: Path | None, fallback: str) -> QToolButton:
         botao = QToolButton(self)
