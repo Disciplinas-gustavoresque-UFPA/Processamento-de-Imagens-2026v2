@@ -53,9 +53,8 @@ class FiltroNegativo(PluginBase):
 
     def _ao_aplicar(self) -> None:
         imagem_processada = self.processar(self.imagem_original)
-
-        print("Emitindo apply_requested...")
-
+        print("Enviando preview...")
+        self.preview_requested.emit(imagem_processada)
+        print("Enviando apply...")
         self.apply_requested.emit(imagem_processada)
-
         self.accept()
