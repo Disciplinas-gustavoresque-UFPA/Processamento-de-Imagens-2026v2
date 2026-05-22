@@ -888,35 +888,37 @@ class JanelaPrincipal(QMainWindow):
             self._ao_zoom_alterado(zoom_atual)
 
     def keyPressEvent(self, evento) -> None:
-        """Inicia o modo de arrasto (Barra de Espaço) delegando para a aba atual."""
-        if evento.key() == Qt.Key.Key_Space and not evento.isAutoRepeat():
-            aba_atual = self.tabs.currentWidget()
-            
-            # Repassa ao DocumentoImagem (assumindo que ele herdará/instanciará o VisualizadorImagem)
-            if aba_atual and hasattr(aba_atual, 'definir_modo_arrasto'):
-                aba_atual.definir_modo_arrasto(True)
-                
-            evento.accept()
-            return
-        super().keyPressEvent(evento)
-
-    def keyReleaseEvent(self, evento) -> None:
-        """Encerra o modo de arrasto (Barra de Espaço) delegando para a aba atual."""
-        if evento.key() == Qt.Key.Key_Space and not evento.isAutoRepeat():
-            aba_atual = self.tabs.currentWidget()
-            
-            if aba_atual and hasattr(aba_atual, 'definir_modo_arrasto'):
-                aba_atual.definir_modo_arrasto(False)
-                
-            evento.accept()
-            return
-        super().keyReleaseEvent(evento)
-        
-    def keyPressEvent(self, evento) -> None:
+        """Atalhos globais."""
+    
         if evento.matches(QKeySequence.StandardKey.Undo):
             self.desfazer()
             return
+
+        if evento.key() == Qt.Key.Key_Space and not evento.isAutoRepeat():
+            aba_atual = self.tabs.currentWidget()
+
+            if aba_atual and hasattr(aba_atual, 'definir_modo_arrasto'):
+                aba_atual.definir_modo_arrasto(True)
+
+            evento.accept()
+            return
+
         super().keyPressEvent(evento)
+
+
+    def keyReleaseEvent(self, evento) -> None:
+        """Encerra o modo de arrasto."""
+    
+        if evento.key() == Qt.Key.Key_Space and not evento.isAutoRepeat():
+            aba_atual = self.tabs.currentWidget()
+
+            if aba_atual and hasattr(aba_atual, 'definir_modo_arrasto'):
+                aba_atual.definir_modo_arrasto(False)
+
+            evento.accept()
+            return
+
+        super().keyReleaseEvent(evento)
 
     # ------------------------------------------------------------------
     # Utilitários de exibição
