@@ -48,14 +48,10 @@ if _DIRETORIO_RAIZ not in sys.path:
 from core.plugin_base import PluginBase  # noqa: E402  (importação após sys.path)
 from components.zoom import VisualizadorImagem  # noqa: E402
 from layout import BarraFerramentasEsquerda, BarraLateralDireita  # noqa: E402
-from plugins.pixels.filtro_brilho_contraste import FiltroBrilhoContraste  # noqa: E402
-from plugins.pixels.filtro_escala_de_cinza import FiltroEscalaDeCinza  # noqa: E402
-from plugins.pixels.filtro_saturacao import FiltroSaturacao  # noqa: E402
-from plugins.pixels.salt_pepper_noise import SaltPepperNoise  # noqa: E402
-from plugins.imagem.transformar.transformacoes_geometricas import TransformacoesGeometricas  # noqa: E402
 
 
 _HANDLER_MENSAGENS_QT = None
+_HANDLER_MENSAGENS_QT_ANTERIOR = None
 
 
 def _instalar_filtro_mensagens_qt() -> None:
@@ -67,18 +63,26 @@ def _instalar_filtro_mensagens_qt() -> None:
     """
 
     global _HANDLER_MENSAGENS_QT
+    global _HANDLER_MENSAGENS_QT_ANTERIOR
     if _HANDLER_MENSAGENS_QT is not None:
         return
 
-    def handler(_tipo, _contexto, mensagem: str) -> None:
+    def handler(tipo, contexto, mensagem: str) -> None:
         if mensagem.startswith(
             "QFont::setPointSize: Point size <= 0 (-1), must be greater than 0"
         ):
             return
+
+        handler_anterior = _HANDLER_MENSAGENS_QT_ANTERIOR
+        if callable(handler_anterior):
+            handler_anterior(tipo, contexto, mensagem)
+            return
+
+        # Fallback: mantém ao menos a mensagem visível caso não exista handler anterior.
         sys.stderr.write(mensagem + "\n")
 
     _HANDLER_MENSAGENS_QT = handler
-    qInstallMessageHandler(_HANDLER_MENSAGENS_QT)
+    _HANDLER_MENSAGENS_QT_ANTERIOR = qInstallMessageHandler(_HANDLER_MENSAGENS_QT)
 
 
 # ---------------------------------------------------------------------------
@@ -612,21 +616,52 @@ class JanelaPrincipal(QMainWindow):
 
     def _ao_ajuste_solicitado(self, ajuste: str) -> None:
         """Abre o plugin correspondente ao ajuste clicado na barra lateral direita."""
-        mapa_ajustes: dict[str, type[PluginBase]] = {
-            "brilho_contraste": FiltroBrilhoContraste,
-            "preto_branco": FiltroEscalaDeCinza,
-            "saturacao": FiltroSaturacao,
-            "ruido_salt_pepper": SaltPepperNoise,
-        }
+        try:
+            if ajuste == "brilho_contraste":
+                from plugins.pixels.filtro_brilho_contraste import FiltroBrilhoContraste
 
-        classe_plugin = mapa_ajustes.get(ajuste)
-        if classe_plugin is None:
+                classe_plugin: type[PluginBase] = FiltroBrilhoContraste
+            elif ajuste == "preto_branco":
+                from plugins.pixels.filtro_escala_de_cinza import FiltroEscalaDeCinza
+
+                classe_plugin = FiltroEscalaDeCinza
+            elif ajuste == "saturacao":
+                from plugins.pixels.filtro_saturacao import FiltroSaturacao
+
+                classe_plugin = FiltroSaturacao
+            elif ajuste == "ruido_salt_pepper":
+                from plugins.pixels.salt_pepper_noise import SaltPepperNoise
+
+                classe_plugin = SaltPepperNoise
+            else:
+                return
+        except Exception as erro:
+            QMessageBox.critical(
+                self,
+                "Erro",
+                "Falha ao carregar o ajuste selecionado.\n\n"
+                f"Ajuste: {ajuste}\n"
+                f"Detalhes: {erro}",
+            )
             return
 
         self.abrir_plugin(classe_plugin)
 
     def _abrir_plugin_rotacao_espelhamento(self) -> None:
         """Abre o diálogo de rotação e espelhamento."""
+        try:
+            from plugins.imagem.transformar.transformacoes_geometricas import (
+                TransformacoesGeometricas,
+            )
+        except Exception as erro:
+            QMessageBox.critical(
+                self,
+                "Erro",
+                "Falha ao carregar o plugin de rotação/espelhamento.\n\n"
+                f"Detalhes: {erro}",
+            )
+            return
+
         self.abrir_plugin(TransformacoesGeometricas)
 
     def _atualizar_visibilidade_laterais(self, imagem_ativa: bool) -> None:
