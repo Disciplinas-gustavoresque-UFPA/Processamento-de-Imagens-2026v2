@@ -51,3 +51,23 @@ Registro contínuo das métricas de engajamento, pontuações e badges atribuíd
 
 #### 🧠 John Nash da turma
 1. **@Motaromc** - 1 badges
+
+## 📅 Semana de 25/05/2026
+
+### 📊 Métricas de Engajamento da Semana
+| Aluno | Issues Abertas | PRs Abertos | Comentários (Próprios) | Comentários (Outros) | Code Reviews |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **@antenoraires** | 0 | 0 | 0 | 2 | 0 |
+| **@alfredoserrao** | 0 | 1 | 0 | 0 | 0 |
+| **@ygarasab** | 0 | 0 | 1 | 0 | 0 |
+| **@sayydaviid** | 0 | 0 | 1 | 0 | 0 |
+| **@lorenarss** | 0 | 0 | 1 | 0 | 0 |
+
+---
+
+### 🏆 Badges Conquistadas
+#### ⌨️ Jack Bauer do Código
+1. **@Motaromc** - 1691 linhas
+2. **@alfa-m** - 505 linhas
+3. **@ygarasab** - 224 linhas
+
