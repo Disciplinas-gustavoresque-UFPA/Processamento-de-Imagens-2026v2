@@ -464,7 +464,7 @@ class JanelaPrincipal(QMainWindow):
         if not _menu_tem_acao_folha(menu_imagem):
             aviso = menu_imagem.addAction("(nenhum plugin encontrado)")
             aviso.setEnabled(False)
-        
+
         # --- Menu Pixels (operações pontuais) ---
         menu_pixels = barra.addMenu("Pixels")
         diretorio_pixels = os.path.join(_DIRETORIO_RAIZ, "plugins", "pixels")
@@ -481,6 +481,19 @@ class JanelaPrincipal(QMainWindow):
 
         if not _menu_tem_acao_folha(menu_filtros):
             aviso = menu_filtros.addAction("(nenhum plugin encontrado)")
+            aviso.setEnabled(False)
+
+        # --- Menu Reconhecimento (leitura e identificação de padrões) ---
+        menu_reconhecimento = barra.addMenu("Reconhecimento")
+        diretorio_reconhecimento = os.path.join(
+            _DIRETORIO_RAIZ, "plugins", "reconhecimento"
+        )
+        carregar_plugins_dinamicamente(
+            menu_reconhecimento, diretorio_reconhecimento, self
+        )
+
+        if not _menu_tem_acao_folha(menu_reconhecimento):
+            aviso = menu_reconhecimento.addAction("(nenhum plugin encontrado)")
             aviso.setEnabled(False)
 
     # ------------------------------------------------------------------
