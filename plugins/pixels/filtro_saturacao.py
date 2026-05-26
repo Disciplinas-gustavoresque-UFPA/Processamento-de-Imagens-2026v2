@@ -22,7 +22,7 @@ Onde:
 """
 
 import numpy as np
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -55,6 +55,9 @@ class FiltroSaturacao(PluginBase):
     # LUT estática: evita exponenciação **2.4 em milhões de pixels no decode.
     _LUT_SRGB_PARA_LINEAR = _construir_lut_srgb_para_linear()
 
+    # Atraso (ms) entre o último movimento do slider e o disparo do preview.
+    _DEBOUNCE_PREVIEW_MS = 80
+
     # ------------------------------------------------------------------
     # Interface (setup_ui)
     # ------------------------------------------------------------------
@@ -85,6 +88,14 @@ class FiltroSaturacao(PluginBase):
         layout_botoes.addWidget(self._btn_aplicar)
         layout_botoes.addWidget(self._btn_cancelar)
         layout_principal.addLayout(layout_botoes)
+
+        # Debounce: arrastar o slider só dispara processar() depois que o
+        # usuário para de movê-lo. Sem isso, o pipeline pesado de gama é
+        # invocado a cada tick e a UI engasga em imagens grandes.
+        self._timer_preview = QTimer(self)
+        self._timer_preview.setSingleShot(True)
+        self._timer_preview.setInterval(self._DEBOUNCE_PREVIEW_MS)
+        self._timer_preview.timeout.connect(self._emitir_preview)
 
         self._slider_saturacao.valueChanged.connect(self._ao_mudar_saturacao)
         self._btn_aplicar.clicked.connect(self._ao_aplicar)
@@ -171,18 +182,26 @@ class FiltroSaturacao(PluginBase):
     # ------------------------------------------------------------------
 
     def _ao_mudar_saturacao(self, _valor: int) -> None:
-        """Atualiza rótulos e emite o sinal de pré-visualização."""
+        """Atualiza rótulos imediatamente e agenda o preview com debounce."""
         valor_slider = self._slider_saturacao.value()
         escala = self._obter_escala_gimp()
 
         self._rotulo_slider.setText(f"Saturação: {valor_slider:+d}")
         self._rotulo_escala.setText(f"Escala GIMP (s): {escala:.2f}")
 
+        # start() reinicia o timer: enquanto o usuário move o slider, o
+        # disparo é adiado. processar() só roda quando o movimento para.
+        self._timer_preview.start()
+
+    def _emitir_preview(self) -> None:
+        """Processa a imagem com o valor atual do slider e emite o preview."""
         imagem_processada = self.processar(self.imagem_original)
         self.preview_requested.emit(imagem_processada)
 
     def _ao_aplicar(self) -> None:
         """Emite o sinal de confirmação e fecha o diálogo."""
+        # Garante que nenhum preview pendente dispare depois do apply.
+        self._timer_preview.stop()
         imagem_processada = self.processar(self.imagem_original)
         self.apply_requested.emit(imagem_processada)
         self.accept()
