@@ -105,16 +105,11 @@ class FiltroSaturacao(PluginBase):
         """Codifica de RGB Linear de volta para sRGB."""
         # Faz clipping antes da curva para manter o domínio válido.
         v_linear = np.clip(v_linear, 0.0, 1.0)
-
-        is_linear = v_linear <= 0.0031308
-        v_srgb = np.zeros_like(v_linear)
-
-        # Trecho linear
-        v_srgb[is_linear] = v_linear[is_linear] * 12.92
-        # Trecho exponencial
-        v_srgb[~is_linear] = 1.055 * (v_linear[~is_linear] ** (1.0 / 2.4)) - 0.055
-
-        return v_srgb
+        return np.where(
+            v_linear <= 0.0031308,
+            v_linear * 12.92,
+            1.055 * (v_linear ** (1.0 / 2.4)) - 0.055,
+        )
 
     def _obter_escala_gimp(self) -> float:
         """
