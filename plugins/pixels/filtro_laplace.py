@@ -94,9 +94,16 @@ class FiltroLaplace(PluginBase):
         # Converte para escala de cinza
         cinza = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
 
+        # Suavização para reduzir ruídos
+        cinza_suavizada = cv2.GaussianBlur(
+        cinza,
+        (5, 5),  # tamanho da máscara
+        0        # sigma automático
+    )
+
         # Aplica operador Laplaciano
         laplace = cv2.Laplacian(
-            cinza,
+            cinza_suavizada,
             cv2.CV_64F,
             ksize=3
         )
