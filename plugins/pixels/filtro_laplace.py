@@ -97,7 +97,7 @@ class FiltroLaplace(PluginBase):
         # Suavização para reduzir ruídos
         cinza_suavizada = cv2.GaussianBlur(
         cinza,
-        (5, 5),  # tamanho da máscara
+        (3, 3),  # tamanho da máscara
         0        # sigma automático
     )
 
