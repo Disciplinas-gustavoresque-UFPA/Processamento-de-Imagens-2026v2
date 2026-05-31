@@ -29,6 +29,7 @@ class FiltroBinario(PluginBase):
         opcoes = [
             ("Sem Filtro", "sem_filtro"),
             ("Binário", "binario"),
+            ("Binário Otsu", "otsu"),
         ]
 
         for texto, valor in opcoes:
@@ -67,6 +68,7 @@ class FiltroBinario(PluginBase):
         self.setLayout(layout_principal)
         self.setMinimumWidth(320)
 
+        # força preview após renderização da janela
         QTimer.singleShot(100, self._emitir_preview)
 
     def _obter_opcao(self) -> str:
@@ -93,23 +95,38 @@ class FiltroBinario(PluginBase):
         else:
             rgb = imagem
 
+        # Converte para escala de cinza
         cinza = cv2.cvtColor(
             rgb,
             cv2.COLOR_RGB2GRAY
         )
 
-        _, binaria = cv2.threshold(
-            cinza,
-            127,
-            255,
-            cv2.THRESH_BINARY
-        )
+        if opcao == "binario":
+            _, resultado_binario = cv2.threshold(
+                cinza,
+                127,
+                255,
+                cv2.THRESH_BINARY
+            )
 
+        elif opcao == "otsu":
+            _, resultado_binario = cv2.threshold(
+                cinza,
+                0,
+                255,
+                cv2.THRESH_BINARY + cv2.THRESH_OTSU
+            )
+
+        else:
+            return imagem.copy()
+
+        # Converte de volta para RGB
         resultado = cv2.cvtColor(
-            binaria,
+            resultado_binario,
             cv2.COLOR_GRAY2RGB
         )
 
+        # Reanexa alpha se existir
         if possui_alpha:
             resultado = np.dstack(
                 (resultado, alpha)
@@ -118,9 +135,13 @@ class FiltroBinario(PluginBase):
         return resultado
 
     def _emitir_preview(self) -> None:
-        imagem_processada = self.processar(self.imagem_original)
+        imagem_processada = self.processar(
+            self.imagem_original
+        )
 
-        self.preview_requested.emit(imagem_processada)
+        self.preview_requested.emit(
+            imagem_processada
+        )
 
     def _ao_mudar_opcao(self, marcado: bool) -> None:
         if not marcado:
@@ -135,9 +156,16 @@ class FiltroBinario(PluginBase):
         self._emitir_preview()
 
     def _ao_aplicar(self) -> None:
-        imagem_processada = self.processar(self.imagem_original)
+        imagem_processada = self.processar(
+            self.imagem_original
+        )
 
-        self.preview_requested.emit(imagem_processada)
-        self.apply_requested.emit(imagem_processada)
+        self.preview_requested.emit(
+            imagem_processada
+        )
+
+        self.apply_requested.emit(
+            imagem_processada
+        )
 
         self.accept()
