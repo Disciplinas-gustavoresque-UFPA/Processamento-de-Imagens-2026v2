@@ -30,7 +30,6 @@ class FiltroBinario(PluginBase):
         opcoes = [
             ("Sem Filtro", "sem_filtro"),
             ("Binário", "binario"),
-            ("Binário Otsu", "otsu"),
         ]
 
         for texto, valor in opcoes:
@@ -186,15 +185,6 @@ class FiltroBinario(PluginBase):
                 limiar,
                 255,
                 cv2.THRESH_BINARY,
-            )
-
-        elif opcao == "otsu":
-            _, resultado_binario = cv2.threshold(
-                cinza,
-                0,
-                255,
-                cv2.THRESH_BINARY
-                + cv2.THRESH_OTSU,
             )
 
         else:
