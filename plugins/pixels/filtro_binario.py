@@ -16,7 +16,7 @@ from core.plugin_base import PluginBase
 
 
 class FiltroBinario(PluginBase):
-    display_name = "Binário"
+    display_name = "Binário - Limiar Global"
 
     def setup_ui(self) -> None:
         layout_principal = QVBoxLayout(self)
@@ -29,7 +29,7 @@ class FiltroBinario(PluginBase):
 
         opcoes = [
             ("Sem Filtro", "sem_filtro"),
-            ("Binário", "binario"),
+            ("Binário - Limiar Global", "binario"),
         ]
 
         for texto, valor in opcoes:
