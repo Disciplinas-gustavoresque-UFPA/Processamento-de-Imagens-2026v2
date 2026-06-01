@@ -7,7 +7,7 @@ Funcionalidades
 ---------------
 * Abrir e fechar imagens (PNG, JPG, BMP, TIFF).
 * Suporte a abertura a múltiplas imagens via abas
-* Barra superior com abas exibindo miniaturas das imagens.
+* Barra superior com abas exibindo o nome das imagens.
 * Exibir a imagem em um QLabel centralizado com redimensionamento automático.
 * Carregar plugins dinamicamente em três grupos de menu:
     - ``Pixels`` para operações pontuais (ex.: brilho/contraste).
@@ -24,12 +24,11 @@ import sys
 
 import cv2
 import numpy as np
-from PySide6.QtCore import Qt, Signal, qInstallMessageHandler
-from PySide6.QtGui import QImage, QKeySequence, QPixmap
-from PySide6.QtCore import Qt, Signal, QSize, QTimer
-from PySide6.QtGui import QImage, QKeySequence, QPixmap, QIcon
+from PySide6.QtCore import Qt, QSettings, Signal, QSize, QTimer, qInstallMessageHandler
+from PySide6.QtGui import QColor, QImage, QKeySequence, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -39,8 +38,11 @@ from PySide6.QtWidgets import (
     QPushButton,
     QStackedWidget,
     QStatusBar,
+    QSizePolicy,
+    QTabBar,
     QTabWidget,
     QDialog,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -341,52 +343,7 @@ class TelaBoasVindas(QWidget):
         super().__init__(parent)
         self.janela = janela_principal
 
-# ---------------------------------------------------------------------------
-# Janela Principal
-# ---------------------------------------------------------------------------
-class JanelaPrincipal(QMainWindow):
-    """Janela principal do Studio de Processamento de Imagens."""
-
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Studio de Processamento de Imagens")
-        self.resize(900, 650)
-        self._modo_zoom_toolbar = "zoom"
-        self._ferramenta_ativa_toolbar = "mover"
-
-        # Estado interno
-        self._imagem_atual: np.ndarray | None = None   # BGR (OpenCV)
-        self._imagem_backup: np.ndarray | None = None  # cópia antes do plugin
-
-        self._construir_interface()
-        self._construir_menus()
-
-    # ------------------------------------------------------------------
-    # Construção da interface
-    # ------------------------------------------------------------------
-
-    def _construir_interface(self) -> None:
-        """Cria o layout central com toolbar lateral e área de visualização."""
-        container_central = QWidget(self)
-        layout_central = QHBoxLayout(container_central)
-        layout_central.setContentsMargins(0, 0, 0, 0)
-        layout_central.setSpacing(0)
-
-        self._toolbar_esquerda = BarraFerramentasEsquerda(container_central)
-        self._toolbar_esquerda.ferramenta_alterada.connect(self._ao_ferramenta_alterada)
-        self._toolbar_esquerda.modo_zoom_alterado.connect(self._ao_modo_zoom_toolbar_alterado)
-        layout_central.addWidget(self._toolbar_esquerda)
-
-        self._stacked = QStackedWidget(container_central)
-        layout_central.addWidget(self._stacked, 1)
-
-        self._sidebar_direita = BarraLateralDireita(container_central)
-        self._sidebar_direita.ajuste_solicitado.connect(self._ao_ajuste_solicitado)
-        layout_central.addWidget(self._sidebar_direita)
-
-        # Página 0: placeholder com botões para quando não há imagem
-        self._placeholder = QWidget(self)
-        layout_placeholder = QVBoxLayout(self._placeholder)
+        layout_placeholder = QVBoxLayout(self)
         layout_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         titulo = QLabel("Studio de Processamento de Imagens")
@@ -434,6 +391,130 @@ class JanelaPrincipal(QMainWindow):
         layout_placeholder.addWidget(area_arrastar, alignment=Qt.AlignmentFlag.AlignCenter)
         layout_placeholder.addStretch()
 
+
+class BarraAbas(QTabBar):
+    """Barra de abas que condensa largura sem estourar o espaco disponível."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setDrawBase(False)
+        self._largura_minima = 36
+        self._largura_maxima = 320
+        self._margem_condensar = 24
+        self._cor_fundo = QColor("#1e1e1e")
+
+    def tabSizeHint(self, index):
+        barra_base = super(BarraAbas, self)
+        tamanho = barra_base.tabSizeHint(index)
+        total = self.count()
+        if total <= 0 or index < 0 or index >= total:
+            return tamanho
+
+        largura_disponivel = self._largura_disponivel()
+        if largura_disponivel <= 0:
+            largura_disponivel = sum(
+                max(self._largura_minima, barra_base.tabSizeHint(i).width())
+                for i in range(total)
+            )
+
+        larguras_base = [
+            min(
+                self._largura_maxima,
+                max(self._largura_minima, barra_base.tabSizeHint(i).width()),
+            )
+            for i in range(total)
+        ]
+        largura_total_base = sum(larguras_base)
+        limite = max(0, largura_disponivel - self._margem_condensar)
+
+        if largura_total_base <= limite:
+            tamanho.setWidth(larguras_base[index])
+            return tamanho
+
+        largura_calculada = limite // total
+        largura_final = max(
+            self._largura_minima,
+            min(larguras_base[index], self._largura_maxima, largura_calculada),
+        )
+        tamanho.setWidth(largura_final)
+        return tamanho
+
+    def minimumTabSizeHint(self, index):
+        tamanho = super().minimumTabSizeHint(index)
+        tamanho.setWidth(self._largura_minima)
+        return tamanho
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.updateGeometry()
+        self.update()
+
+    def paintEvent(self, event):
+        pintor = QPainter(self)
+        pintor.fillRect(self.rect(), self._cor_fundo)
+        pintor.end()
+
+        super().paintEvent(event)
+
+        if self.count() <= 0:
+            return
+
+        direita_abas = max(self.tabRect(i).right() for i in range(self.count()))
+        if direita_abas + 1 >= self.width():
+            return
+
+        pintor = QPainter(self)
+        area_vazia = self.rect().adjusted(direita_abas + 1, 0, 0, 0)
+        pintor.fillRect(area_vazia, self._cor_fundo)
+        pintor.end()
+
+    def tabInserted(self, index):
+        super().tabInserted(index)
+        self.updateGeometry()
+
+    def tabRemoved(self, index):
+        super().tabRemoved(index)
+        self.updateGeometry()
+
+    def _largura_disponivel(self) -> int:
+        widget_pai = self.parentWidget()
+        if widget_pai is not None and widget_pai.contentsRect().width() > 0:
+            return widget_pai.contentsRect().width()
+        return self.width()
+
+
+class AbasImagem(QTabWidget):
+    """QTabWidget que mantém a faixa do cabeçalho com o fundo escuro."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._cor_fundo = QColor("#1e1e1e")
+
+    def paintEvent(self, event):
+        pintor = QPainter(self)
+        pintor.fillRect(self.rect(), self._cor_fundo)
+        pintor.end()
+
+        super().paintEvent(event)
+
+        barra = self.tabBar()
+        if barra is None:
+            return
+
+        geometria_barra = barra.geometry()
+        esquerda = geometria_barra.right() + 1
+        altura = geometria_barra.height()
+        if esquerda >= self.width() or altura <= 0:
+            return
+
+        area_vazia = self.rect()
+        area_vazia.setLeft(esquerda)
+        area_vazia.setHeight(altura)
+
+        pintor = QPainter(self)
+        pintor.fillRect(area_vazia, self._cor_fundo)
+        pintor.end()
+
 # ---------------------------------------------------------------------------
 # Janela Principal
 # ---------------------------------------------------------------------------
@@ -445,6 +526,16 @@ class JanelaPrincipal(QMainWindow):
         self.setWindowTitle("Studio de Processamento de Imagens")
         self.resize(900, 650)
 
+        self._modo_zoom_toolbar = "zoom"
+        self._ferramenta_ativa_toolbar = "mover"
+        self._imagem_atual: np.ndarray | None = None
+        self._configuracoes = QSettings(
+            "ProcessamentoDeImagens", "StudioDeProcessamentoDeImagens"
+        )
+        self._mostrar_aviso_fechamento = self._configuracoes.value(
+            "avisos/confirmar_fechamento_arquivo", True, type=bool
+        )
+
         self._construir_interface()
         self._construir_menus()
 
@@ -453,24 +544,76 @@ class JanelaPrincipal(QMainWindow):
     # ------------------------------------------------------------------
 
     def _construir_interface(self) -> None:
-        """Cria o widget central (área de visualização da imagem)."""
-        self._stacked = QStackedWidget(self)
+        """Cria o layout central com toolbar lateral e área de visualização."""
+        container_central = QWidget(self)
+        layout_central = QHBoxLayout(container_central)
+        layout_central.setContentsMargins(0, 0, 0, 0)
+        layout_central.setSpacing(0)
+
+        self._toolbar_esquerda = BarraFerramentasEsquerda(container_central)
+        self._toolbar_esquerda.ferramenta_alterada.connect(self._ao_ferramenta_alterada)
+        self._toolbar_esquerda.modo_zoom_alterado.connect(self._ao_modo_zoom_toolbar_alterado)
+        layout_central.addWidget(self._toolbar_esquerda)
+
+        self._stacked = QStackedWidget(container_central)
+        layout_central.addWidget(self._stacked, 1)
+
+        self._sidebar_direita = BarraLateralDireita(container_central)
+        self._sidebar_direita.ajuste_solicitado.connect(self._ao_ajuste_solicitado)
+        layout_central.addWidget(self._sidebar_direita)
       
         # Página 0: placeholder com botões para quando não há imagem
         self._placeholder = TelaBoasVindas(self)
         
         # Página 1: abas para múltiplas imagens
-        self.tabs = QTabWidget(self)
-        self.tabs.setTabsClosable(True) # Habilita o botão (X) em cada aba
+        self.tabs = AbasImagem(self)
+        self.tabs.setTabBar(BarraAbas(self.tabs))
+        self.tabs.setTabsClosable(False)
         self.tabs.setElideMode(Qt.TextElideMode.ElideRight)
-        
-        # Estilo para deixar as abas maiores (para caber a miniatura)
-        self.tabs.setIconSize(QSize(30, 30))
+        self.tabs.setIconSize(QSize(0, 0))
+        self.tabs.setUsesScrollButtons(False)
+        self.tabs.tabBar().setExpanding(False)
+        self.tabs.tabBar().setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.tabs.setAutoFillBackground(False)
+        self.tabs.tabBar().setAutoFillBackground(False)
         self.tabs.setStyleSheet("""
-            QTabBar { alignment: left; }
-            QTabBar::tab { height: 40px; max-width: 120px; padding: 5px 10px; }
-            QTabWidget::pane { border-top: 2px solid #C2C7CB; }
-            QTabBar::close-button { subcontrol-position: right; subcontrol-origin: padding; margin-top: 2px; margin-right: 2px; }
+            QTabWidget { background: #1e1e1e; }
+            QTabWidget::pane { border: none; background: #1e1e1e; }
+            QTabWidget::tab-bar { left: 0px; background: #1e1e1e; }
+            QTabWidget::left-corner, QTabWidget::right-corner { background: #1e1e1e; }
+            QTabBar { alignment: left; background: #1e1e1e; }
+            QTabBar::base { background: #1e1e1e; border: none; }
+            QTabBar::scroller { background: #1e1e1e; }
+            QTabBar::tab {
+                background: #1e1e1e;
+                color: #f3f4f6;
+                padding: 2px 18px 2px 6px;
+                height: 22px;
+                min-height: 22px;
+                min-width: 36px;
+                border: none;
+                border-radius: 0px;
+                margin: 0px;
+            }
+            QTabBar::tab:selected {
+                background: #1e1e1e;
+            }
+            QTabBar::tab:!selected {
+                background: #1e1e1e;
+                color: #d1d5db;
+            }
+            QToolButton#tabCloseButton {
+                color: #f3f4f6;
+                background: transparent;
+                border: none;
+                min-width: 12px;
+                min-height: 12px;
+                font-size: 11px;
+                padding: 0px 2px;
+            }
+            QToolButton#tabCloseButton:hover {
+                background: #2c2c2c;
+            }
         """)
         
         self.tabs.currentChanged.connect(self._atualizar_zoom_ao_trocar_aba)
@@ -486,8 +629,6 @@ class JanelaPrincipal(QMainWindow):
         self.setCentralWidget(container_central)
 
         self._atualizar_visibilidade_laterais(False)
-
-        self.setCentralWidget(self._stacked)
         
         # Configurações da barra de status
         self.setStatusBar(QStatusBar(self))
@@ -589,7 +730,7 @@ class JanelaPrincipal(QMainWindow):
     # ------------------------------------------------------------------
 
     def abrir_imagem(self) -> None:
-        """Abre a imagem, cria um novo DocumentoImagem e adiciona como aba com miniatura."""
+        """Abre a imagem, cria um novo DocumentoImagem e adiciona como aba."""
         caminhos, _ = QFileDialog.getOpenFileNames(
             self,
             "Abrir Imagem",
@@ -604,75 +745,78 @@ class JanelaPrincipal(QMainWindow):
         for caminho in caminhos:
             self._carregar_imagem_do_caminho(caminho)
 
+    def _normalizar_caminho_imagem(self, caminho: str) -> str:
+        return os.path.normcase(os.path.abspath(caminho))
+
+    def _indice_aba_por_caminho(self, caminho: str) -> int:
+        caminho_normalizado = self._normalizar_caminho_imagem(caminho)
+        for indice in range(self.tabs.count()):
+            aba = self.tabs.widget(indice)
+            if not isinstance(aba, DocumentoImagem):
+                continue
+            if self._normalizar_caminho_imagem(aba.caminho) == caminho_normalizado:
+                return indice
+        return -1
+
     def _carregar_imagem_do_caminho(self, caminho: str) -> None:
         """Carrega uma imagem a partir do caminho informado e adiciona como uma nova aba."""
+        indice_existente = self._indice_aba_por_caminho(caminho)
+        if indice_existente != -1:
+            self.tabs.setCurrentIndex(indice_existente)
+            self._stacked.setCurrentIndex(1)
+            self._atualizar_visibilidade_laterais(True)
+
+            aba_existente = self.tabs.widget(indice_existente)
+            if isinstance(aba_existente, DocumentoImagem):
+                self._imagem_atual = aba_existente.imagem_atual
+
+            self._ao_ferramenta_alterada(self._ferramenta_ativa_toolbar)
+            self.statusBar().showMessage(
+                f"Imagem ja aberta: {os.path.basename(caminho)}"
+            )
+            return
+
         imagem_bgr = cv2.imread(caminho)
         if imagem_bgr is None:
             QMessageBox.critical(self, "Erro", f"Não foi possível abrir:\n{caminho}")
             return
 
         self._imagem_atual = imagem_bgr
-        self._atualizar_visibilidade_laterais(True)
-        self._stacked.setCurrentIndex(1)
-        self._exibir_imagem(imagem_bgr, ajustar_a_janela=True)
-        # Reaplica a ferramenta atual para manter consistência visual/comportamental
-        self._ao_ferramenta_alterada(self._ferramenta_ativa_toolbar)
-        self.statusBar().showMessage(f"Imagem carregada: {caminho}")
         # Instancia o documento com a imagem carregada
         novo_documento = DocumentoImagem(caminho, imagem_bgr)
         novo_documento.zoom_alterado.connect(self._ao_zoom_alterado)
         
-        # Gera a miniatura (Icon) para a aba
-        miniatura_icon = self._gerar_icone_miniatura(imagem_bgr)
-        
         # Extrai apenas o nome do arquivo para exibir na aba
         nome_arquivo = os.path.basename(caminho)
         
-        # Adiciona a aba com a miniatura e o nome
+        # Adiciona a aba com o nome do arquivo
         aba_atual = self.tabs.currentWidget()
         if isinstance(aba_atual, TelaBoasVindas):
             indice_insercao = self.tabs.currentIndex()
             self.tabs.removeTab(indice_insercao)
             aba_atual.deleteLater()
-            self.tabs.insertTab(indice_insercao, novo_documento, miniatura_icon, nome_arquivo)
+            self.tabs.insertTab(indice_insercao, novo_documento, nome_arquivo)
         else:
-            indice_insercao = self.tabs.addTab(novo_documento, miniatura_icon, nome_arquivo)
+            indice_insercao = self.tabs.addTab(novo_documento, nome_arquivo)
             
         self.tabs.setTabToolTip(indice_insercao, nome_arquivo)
+        self._adicionar_botao_fechar_aba(indice_insercao, novo_documento)
         self.tabs.setCurrentIndex(indice_insercao)
+
+        # Reaplica a ferramenta atual no visualizador da nova aba
+        self._ao_ferramenta_alterada(self._ferramenta_ativa_toolbar)
 
         # Alterna o QStackedWidget para mostrar a página de abas (Página 1)
         self._stacked.setCurrentIndex(1)
+        self._atualizar_visibilidade_laterais(True)
 
         self.statusBar().showMessage(f"Imagem carregada: {nome_arquivo}")
-
-    def _gerar_icone_miniatura(self, imagem_bgr: np.ndarray) -> QIcon:
-        """Converte uma imagem OpenCV para QIcon para usar na aba."""
-        imagem_rgb = cv2.cvtColor(imagem_bgr, cv2.COLOR_BGR2RGB)
-        altura, largura, canais = imagem_rgb.shape
-        qimage = QImage(imagem_rgb.data, largura, altura, canais * largura, QImage.Format.Format_RGB888)
-        
-        # Cria um pixmap quadrado e escala a imagem para caber
-        pixmap = QPixmap(30, 30)
-        pixmap.fill(Qt.GlobalColor.transparent)
-        pixmap_imagem = QPixmap.fromImage(qimage).scaled(
-            30, 30, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
-        )
-        
-        # Desenha a miniatura centralizada no ícone
-        import PySide6.QtGui as QtGui
-        painter = QtGui.QPainter(pixmap)
-        x = (30 - pixmap_imagem.width()) // 2
-        y = (30 - pixmap_imagem.height()) // 2
-        painter.drawPixmap(x, y, pixmap_imagem)
-        painter.end()
-        
-        return QIcon(pixmap)
 
     def abrir_nova_aba(self) -> None:
         """Abre uma nova aba em branco contendo as opções iniciais."""
         nova_aba = TelaBoasVindas(self)
         indice = self.tabs.addTab(nova_aba, "Nova Aba")
+        self._adicionar_botao_fechar_aba(indice, nova_aba)
         self.tabs.setCurrentIndex(indice)
         self._stacked.setCurrentIndex(1)
         self.statusBar().showMessage("Nova aba em branco aberta.")
@@ -692,35 +836,82 @@ class JanelaPrincipal(QMainWindow):
             # Se não houver mais abas abertas, volta para a tela inicial (Página 0)
             if self.tabs.count() == 0:
                 self._stacked.setCurrentIndex(0)
+                self._atualizar_visibilidade_laterais(False)
                 self._atualizar_status_vazio()
+            return
+
+        if not isinstance(aba, DocumentoImagem):
             return
 
         nome_arquivo = os.path.basename(aba.caminho)
 
+        if not self._mostrar_aviso_fechamento:
+            self._fechar_aba_confirmada(indice, aba, nome_arquivo)
+            return
+
         # Cria a instância do QMessageBox
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle("Aviso de Fechamento")
-        msg_box.setText(f"Deseja realmente fechar o arquivo '{nome_arquivo}'?\n\nQualquer modificação não salva será perdida.")
+        msg_box.setText(
+            f"Deseja realmente fechar o arquivo '{nome_arquivo}'?\n\n"
+            "Qualquer modificação não salva será perdida."
+        )
         msg_box.setIcon(QMessageBox.Icon.Warning)
 
         # Adiciona botões com textos personalizados
-        btn_fechar = msg_box.addButton("Sim, fechar arquivo", QMessageBox.ButtonRole.AcceptRole)
-        btn_cancelar = msg_box.addButton("Não, manter aberto", QMessageBox.ButtonRole.RejectRole)
+        btn_fechar = msg_box.addButton(
+            "Sim, fechar arquivo", QMessageBox.ButtonRole.AcceptRole
+        )
+        btn_cancelar = msg_box.addButton(
+            "Não, manter aberto", QMessageBox.ButtonRole.RejectRole
+        )
         msg_box.setDefaultButton(btn_cancelar)
+        checkbox_nao_mostrar = QCheckBox("Não mostrar este aviso novamente", msg_box)
+        msg_box.setCheckBox(checkbox_nao_mostrar)
 
         # Exibe a janela de validação
         msg_box.exec()
 
         # Verifica a resposta do usuário
         if msg_box.clickedButton() == btn_fechar:
-            self.tabs.removeTab(indice)
-            aba.deleteLater() # Libera memória da imagem
-            self.statusBar().showMessage(f"Arquivo '{nome_arquivo}' fechado.")
-            
-            # Se não houver mais abas abertas, volta para a tela inicial (Página 0)
-            if self.tabs.count() == 0:
-                self._stacked.setCurrentIndex(0)
-                self._atualizar_status_vazio()
+            if checkbox_nao_mostrar.isChecked():
+                self._mostrar_aviso_fechamento = False
+                self._configuracoes.setValue(
+                    "avisos/confirmar_fechamento_arquivo", False
+                )
+            self._fechar_aba_confirmada(indice, aba, nome_arquivo)
+
+    def _fechar_aba_confirmada(
+        self, indice: int, aba: QWidget, nome_arquivo: str
+    ) -> None:
+        self.tabs.removeTab(indice)
+        aba.deleteLater()  # Libera memória da imagem
+        self.statusBar().showMessage(f"Arquivo '{nome_arquivo}' fechado.")
+
+        # Se não houver mais abas abertas, volta para a tela inicial (Página 0)
+        if self.tabs.count() == 0:
+            self._stacked.setCurrentIndex(0)
+            self._atualizar_visibilidade_laterais(False)
+            self._atualizar_status_vazio()
+
+    def _adicionar_botao_fechar_aba(self, indice: int, widget: QWidget) -> None:
+        botao = QToolButton(self.tabs)
+        botao.setObjectName("tabCloseButton")
+        botao.setText("x")
+        botao.setFixedSize(14, 14)
+        botao.setCursor(Qt.CursorShape.PointingHandCursor)
+        botao.setAutoRaise(True)
+        botao.clicked.connect(
+            lambda _checked=False, alvo=widget: self._fechar_aba_por_widget(alvo)
+        )
+        self.tabs.tabBar().setTabButton(indice, QTabBar.ButtonPosition.RightSide, botao)
+        self.tabs.tabBar().updateGeometry()
+
+    def _fechar_aba_por_widget(self, widget: QWidget) -> None:
+        indice = self.tabs.indexOf(widget)
+        if indice != -1:
+            self._solicitar_fechamento_aba(indice)
+            return
 
     def _marcar_como_modificado(self, aba: DocumentoImagem, modificado: bool) -> None:
         """Atualiza o estado de modificação da aba e a interface visual."""
@@ -739,11 +930,12 @@ class JanelaPrincipal(QMainWindow):
             # Remove o asterisco e volta o tooltip ao normal
             self.tabs.setTabText(indice, nome_arquivo)
             self.tabs.setTabToolTip(indice, nome_arquivo)
+        self.tabs.tabBar().updateGeometry()
     
     def salvar_imagem(self) -> None:
         """Salva a imagem da aba atual em arquivo."""
         aba_atual = self.tabs.currentWidget()
-        if not aba_atual:
+        if not isinstance(aba_atual, DocumentoImagem):
             QMessageBox.information(self, "Aviso", "Nenhuma imagem para salvar.")
             return
 
@@ -762,8 +954,6 @@ class JanelaPrincipal(QMainWindow):
         if sucesso:
             aba_atual.caminho = caminho
             self.statusBar().showMessage(f"Imagem salva em: {caminho}")
-            # Atualiza a miniatura caso o usuário tenha salvo após aplicar um filtro
-            self.tabs.setTabIcon(self.tabs.currentIndex(), self._gerar_icone_miniatura(aba_atual.imagem_atual))
             self._marcar_como_modificado(aba_atual, False)
         else:
             QMessageBox.critical(self, "Erro", "Falha ao salvar a imagem.")
@@ -795,11 +985,6 @@ class JanelaPrincipal(QMainWindow):
         imagem_bgr = cv2.cvtColor(arr_rgb, cv2.COLOR_RGB2BGR)
 
         self._imagem_atual = imagem_bgr
-        self._atualizar_visibilidade_laterais(True)
-        self._stacked.setCurrentIndex(1)
-        self._exibir_imagem(imagem_bgr, ajustar_a_janela=True)
-        # Reaplica a ferramenta atual para manter consistência visual/comportamental
-        self._ao_ferramenta_alterada(self._ferramenta_ativa_toolbar)
         # Gera um nome genérico para a nova aba
         contador = self.tabs.count() + 1
         nome_arquivo = f"Clipboard_{contador}"
@@ -808,23 +993,26 @@ class JanelaPrincipal(QMainWindow):
         # Instancia o documento de imagem
         novo_documento = DocumentoImagem(caminho_ficticio, imagem_bgr)
         novo_documento.zoom_alterado.connect(self._ao_zoom_alterado)
-        miniatura_icon = self._gerar_icone_miniatura(imagem_bgr)
-        
-        # Adiciona a aba com o ícone (miniatura)
+        # Adiciona a aba com o nome
         aba_atual = self.tabs.currentWidget()
         if isinstance(aba_atual, TelaBoasVindas):
             indice_insercao = self.tabs.currentIndex()
             self.tabs.removeTab(indice_insercao)
             aba_atual.deleteLater()
-            self.tabs.insertTab(indice_insercao, novo_documento, miniatura_icon, nome_arquivo)
+            self.tabs.insertTab(indice_insercao, novo_documento, nome_arquivo)
         else:
-            indice_insercao = self.tabs.addTab(novo_documento, miniatura_icon, nome_arquivo)
+            indice_insercao = self.tabs.addTab(novo_documento, nome_arquivo)
             
         self.tabs.setTabToolTip(indice_insercao, "Imagem colada (Não salva)")
+        self._adicionar_botao_fechar_aba(indice_insercao, novo_documento)
         self.tabs.setCurrentIndex(indice_insercao)
+
+        # Reaplica a ferramenta atual no visualizador da nova aba
+        self._ao_ferramenta_alterada(self._ferramenta_ativa_toolbar)
 
         # Alterna o QStackedWidget para mostrar a página de abas (Página 1)
         self._stacked.setCurrentIndex(1)
+        self._atualizar_visibilidade_laterais(True)
         
         # Marca como modificado para forçar o asterisco e indicar que o arquivo precisa ser salvo
         self._marcar_como_modificado(novo_documento, True)
@@ -844,7 +1032,7 @@ class JanelaPrincipal(QMainWindow):
             Classe do plugin a ser instanciado (subclasse de ``PluginBase``).
         """
         aba_atual = self.tabs.currentWidget()
-        if not aba_atual:
+        if not isinstance(aba_atual, DocumentoImagem):
             QMessageBox.information(
                 self, "Aviso", "Abra uma imagem antes de aplicar um filtro."
             )
@@ -897,23 +1085,18 @@ class JanelaPrincipal(QMainWindow):
         aba.atualizar_visualizacao(imagem_bgr)
 
     def _ao_aplicar_plugin(self, imagem_rgb: np.ndarray, aba: DocumentoImagem) -> None:
-        """Substitui a imagem de trabalho pela imagem processada e atualiza a miniatura da aba."""
+        """Substitui a imagem de trabalho pela imagem processada e atualiza o estado da aba."""
         imagem_bgr = cv2.cvtColor(imagem_rgb, cv2.COLOR_RGB2BGR)
         aba.imagem_atual = imagem_bgr
         aba.imagem_backup = None
         
-        # Atualiza a aba com a nova miniatura
-        indice_aba = self.tabs.indexOf(aba)
-        if indice_aba != -1:
-            self.tabs.setTabIcon(indice_aba, self._gerar_icone_miniatura(imagem_bgr))
-            
         self._marcar_como_modificado(aba, True)
         self.statusBar().showMessage("Filtro aplicado com sucesso.")
 
     def _restaurar_backup(self) -> None:
         """Restaura a imagem da aba atual ao estado anterior."""
         aba_atual = self.tabs.currentWidget()
-        if aba_atual and aba_atual.imagem_backup is not None:
+        if isinstance(aba_atual, DocumentoImagem) and aba_atual.imagem_backup is not None:
             aba_atual.imagem_atual = aba_atual.imagem_backup
             aba_atual.atualizar_visualizacao(aba_atual.imagem_atual)
             aba_atual.imagem_backup = None
@@ -927,19 +1110,26 @@ class JanelaPrincipal(QMainWindow):
         """Aplica o comportamento da ferramenta selecionada na toolbar."""
         self._ferramenta_ativa_toolbar = ferramenta
 
+        aba_atual = self.tabs.currentWidget() if hasattr(self, "tabs") else None
+        visualizador = getattr(aba_atual, "visualizador", None) if aba_atual else None
+
         if ferramenta == "mover":
-            self._visualizador.definir_ferramenta_mao(True)
-            self._visualizador.definir_ferramenta_zoom(None)
+            if visualizador is None:
+                return
+            visualizador.definir_ferramenta_mao(True)
+            visualizador.definir_ferramenta_zoom(None)
             return
 
         if ferramenta == "zoom":
-            self._visualizador.definir_ferramenta_mao(False)
-            self._visualizador.definir_ferramenta_zoom(self._modo_zoom_toolbar)
+            if visualizador is None:
+                return
+            visualizador.definir_ferramenta_mao(False)
+            visualizador.definir_ferramenta_zoom(self._modo_zoom_toolbar)
             return
 
         if ferramenta == "rotação":
             # Abre o diálogo de rotação e espelhamento
-            if self._imagem_atual is None:
+            if not isinstance(aba_atual, DocumentoImagem):
                 return
             self._abrir_plugin_rotacao_espelhamento()
             # Volta para a ferramenta de mover após fechar o diálogo.
@@ -949,14 +1139,21 @@ class JanelaPrincipal(QMainWindow):
             self._toolbar_esquerda.selecionar_ferramenta_por_nome("mover")
             return
 
-        self._visualizador.definir_ferramenta_mao(False)
-        self._visualizador.definir_ferramenta_zoom(None)
+        if visualizador is None:
+            return
+        visualizador.definir_ferramenta_mao(False)
+        visualizador.definir_ferramenta_zoom(None)
 
     def _ao_modo_zoom_toolbar_alterado(self, modo_zoom: str) -> None:
         """Atualiza o modo de zoom selecionado no submenu do botão de zoom."""
         self._modo_zoom_toolbar = modo_zoom
-        if self._ferramenta_ativa_toolbar == "zoom":
-            self._visualizador.definir_ferramenta_zoom(modo_zoom)
+        if self._ferramenta_ativa_toolbar != "zoom":
+            return
+
+        aba_atual = self.tabs.currentWidget()
+        visualizador = getattr(aba_atual, "visualizador", None) if aba_atual else None
+        if visualizador is not None:
+            visualizador.definir_ferramenta_zoom(modo_zoom)
 
     def _ao_ajuste_solicitado(self, ajuste: str) -> None:
         """Abre o plugin correspondente ao ajuste clicado na barra lateral direita."""
@@ -1015,13 +1212,23 @@ class JanelaPrincipal(QMainWindow):
     def _atualizar_zoom_ao_trocar_aba(self, indice: int):
         """Ao trocar de aba, busca o zoom da aba atual e atualiza a barra de status."""
         if indice == -1: # Nenhuma aba aberta (fechou tudo)
+            self._imagem_atual = None
             self._ao_zoom_alterado(1.0)
             return
 
         aba_atual = self.tabs.widget(indice)
-        if aba_atual and hasattr(aba_atual, 'visualizador'):
+        if isinstance(aba_atual, DocumentoImagem):
+            self._imagem_atual = aba_atual.imagem_atual
+            self._atualizar_visibilidade_laterais(True)
             zoom_atual = aba_atual.visualizador._zoom
             self._ao_zoom_alterado(zoom_atual)
+            if self._ferramenta_ativa_toolbar in {"mover", "zoom"}:
+                self._ao_ferramenta_alterada(self._ferramenta_ativa_toolbar)
+            return
+
+        self._imagem_atual = None
+        self._atualizar_visibilidade_laterais(False)
+        self._ao_zoom_alterado(1.0)
 
     def keyPressEvent(self, evento) -> None:
         """Inicia o modo de arrasto (Barra de Espaço) delegando para a aba atual."""
@@ -1058,10 +1265,8 @@ class JanelaPrincipal(QMainWindow):
         Mantido para retrocompatibilidade com funções da branch main.
         """
         aba_atual = self.tabs.currentWidget()
-        if aba_atual:
-            # Se você integrar a lógica de 'ajustar_a_janela' no DocumentoImagem depois, 
-            # você pode passar essa variável como parâmetro aqui também.
-            aba_atual.atualizar_visualizacao(imagem_bgr)
+        if aba_atual and hasattr(aba_atual, "atualizar_visualizacao"):
+            aba_atual.atualizar_visualizacao(imagem_bgr, ajustar_a_janela=ajustar_a_janela)
             
     # ------------------------------------------------------------------
     # Delegação de Zoom para as abas
