@@ -71,3 +71,18 @@ Registro contínuo das métricas de engajamento, pontuações e badges atribuíd
 2. **@alfa-m** - 505 linhas
 3. **@ygarasab** - 224 linhas
 
+## 📅 Semana de 01/06/2026
+
+### 📊 Métricas de Engajamento da Semana
+| Aluno | Issues Abertas | PRs Abertos | Comentários (Próprios) | Comentários (Outros) | Code Reviews |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **@antenoraires** | 0 | 0 | 0 | 2 | 0 |
+| **@ygarasab** | 0 | 1 | 0 | 0 | 0 |
+
+---
+
+### 🏆 Badges Conquistadas
+#### ⌨️ Jack Bauer do Código
+1. **@alfredoserrao** - 114 linhas
+2. **@lorenarss** - 109 linhas
+
