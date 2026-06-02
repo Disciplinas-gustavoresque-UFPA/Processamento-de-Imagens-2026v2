@@ -39,7 +39,7 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 ## 🏆 Hall da Fama - Placar Semanal da Turma
 
-> 🤖 *Placar atualizado automaticamente em: 25/05/2026 00:16*
+> 🤖 *Placar atualizado automaticamente em: 01/06/2026 00:16*
 
 ### ⌨️ Jack Bauer do Código
 *Quem mais codificou na semana (Volume total de linhas mescladas)*
