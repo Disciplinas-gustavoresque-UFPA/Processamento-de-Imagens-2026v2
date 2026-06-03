@@ -46,6 +46,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from core.memento import Historico
 
 # Garante que o diretório raiz do projeto esteja no sys.path para que os
 # plugins possam importar ``core.plugin_base`` sem ajustes manuais.
@@ -536,6 +537,9 @@ class JanelaPrincipal(QMainWindow):
             "avisos/confirmar_fechamento_arquivo", True, type=bool
         )
 
+        # Histórico global de desfazer
+        self._historico = Historico(limite=10)
+
         self._construir_interface()
         self._construir_menus()
 
@@ -664,7 +668,14 @@ class JanelaPrincipal(QMainWindow):
         menu_arquivo.addSeparator()
         acao_sair = menu_arquivo.addAction("Sair")
         acao_sair.triggered.connect(self.close)
+        
+        # --- Menu Editar ---
+        menu_editar = barra.addMenu("Editar")
 
+        acao_desfazer = menu_editar.addAction("Desfazer")
+        acao_desfazer.setShortcut(QKeySequence.StandardKey.Undo)
+        acao_desfazer.triggered.connect(self.desfazer)
+        
         # --- Menu Visualizar ---
         menu_visualizar = barra.addMenu("Visualizar")
 
@@ -1084,14 +1095,61 @@ class JanelaPrincipal(QMainWindow):
         imagem_bgr = cv2.cvtColor(imagem_rgb, cv2.COLOR_RGB2BGR)
         aba.atualizar_visualizacao(imagem_bgr)
 
+
     def _ao_aplicar_plugin(self, imagem_rgb: np.ndarray, aba: DocumentoImagem) -> None:
-        """Substitui a imagem de trabalho pela imagem processada e atualiza o estado da aba."""
+        """
+        Substitui a imagem da aba pela imagem processada,
+        salvando o estado anterior no histórico.
+        """
+        # Salva estado atual antes da alteração
+        if aba.imagem_atual is not None:
+            self._historico.salvar(aba.imagem_atual.copy())
+
         imagem_bgr = cv2.cvtColor(imagem_rgb, cv2.COLOR_RGB2BGR)
+
         aba.imagem_atual = imagem_bgr
         aba.imagem_backup = None
-        
+
+        # Atualiza visualização
+        aba.atualizar_visualizacao(imagem_bgr)
+
+        # Atualiza miniatura da aba
+        indice_aba = self.tabs.indexOf(aba)
+        if indice_aba != -1:
+            self.tabs.setTabIcon(
+                indice_aba,
+                self._gerar_icone_miniatura(imagem_bgr)
+            )
+
         self._marcar_como_modificado(aba, True)
+
         self.statusBar().showMessage("Filtro aplicado com sucesso.")
+
+    def desfazer(self) -> None:
+        """Desfaz a última operação aplicada."""
+        aba_atual = self.tabs.currentWidget()
+
+        if not isinstance(aba_atual, DocumentoImagem):
+            return
+
+        estado = self._historico.desfazer()
+
+        if estado is None:
+            self.statusBar().showMessage("Nada para desfazer.")
+            return
+
+        aba_atual.imagem_atual = estado
+        aba_atual.atualizar_visualizacao(estado)
+
+        # Atualiza miniatura da aba
+        indice_aba = self.tabs.indexOf(aba_atual)
+        if indice_aba != -1:
+            self.tabs.setTabIcon(
+                indice_aba,
+                self._gerar_icone_miniatura(estado)
+            )
+
+        self.statusBar().showMessage("Desfazer realizado.")
 
     def _restaurar_backup(self) -> None:
         """Restaura a imagem da aba atual ao estado anterior."""
@@ -1231,28 +1289,36 @@ class JanelaPrincipal(QMainWindow):
         self._ao_zoom_alterado(1.0)
 
     def keyPressEvent(self, evento) -> None:
-        """Inicia o modo de arrasto (Barra de Espaço) delegando para a aba atual."""
+        """Atalhos globais."""
+    
+        if evento.matches(QKeySequence.StandardKey.Undo):
+            self.desfazer()
+            return
+
         if evento.key() == Qt.Key.Key_Space and not evento.isAutoRepeat():
             aba_atual = self.tabs.currentWidget()
-            
-            # Repassa ao DocumentoImagem (assumindo que ele herdará/instanciará o VisualizadorImagem)
+
             if aba_atual and hasattr(aba_atual, 'definir_modo_arrasto'):
                 aba_atual.definir_modo_arrasto(True)
-                
+
             evento.accept()
             return
+
         super().keyPressEvent(evento)
 
+
     def keyReleaseEvent(self, evento) -> None:
-        """Encerra o modo de arrasto (Barra de Espaço) delegando para a aba atual."""
+        """Encerra o modo de arrasto."""
+    
         if evento.key() == Qt.Key.Key_Space and not evento.isAutoRepeat():
             aba_atual = self.tabs.currentWidget()
-            
+
             if aba_atual and hasattr(aba_atual, 'definir_modo_arrasto'):
                 aba_atual.definir_modo_arrasto(False)
-                
+
             evento.accept()
             return
+
         super().keyReleaseEvent(evento)
 
     # ------------------------------------------------------------------
