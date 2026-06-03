@@ -25,7 +25,7 @@ import sys
 import cv2
 import numpy as np
 from PySide6.QtCore import Qt, QSettings, Signal, QSize, QTimer, qInstallMessageHandler
-from PySide6.QtGui import QColor, QImage, QKeySequence, QPainter, QPixmap
+from PySide6.QtGui import QColor, QIcon, QImage, QKeySequence, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -100,6 +100,8 @@ from camera.gerenciar_camera import DialogoCamera
 # ---------------------------------------------------------------------------
 
 _EXTENSOES_IMAGEM = (".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif")
+_EXTENSOES_SALVAMENTO = {".png", ".jpg", ".jpeg", ".bmp"}
+_EXTENSAO_PADRAO_SALVAMENTO = ".png"
 
 
 class AreaArrastarImagem(QLabel):
@@ -271,6 +273,7 @@ class DocumentoImagem(QWidget):
         self.imagem_atual = imagem_bgr
         self.imagem_backup = None
         self.foi_modificado = False
+        self.historico = Historico(limite=10)
 
         # Configura o layout específico desta aba
         self.layout_interno = QVBoxLayout(self)
@@ -537,9 +540,6 @@ class JanelaPrincipal(QMainWindow):
             "avisos/confirmar_fechamento_arquivo", True, type=bool
         )
 
-        # Histórico global de desfazer
-        self._historico = Historico(limite=10)
-
         self._construir_interface()
         self._construir_menus()
 
@@ -769,6 +769,46 @@ class JanelaPrincipal(QMainWindow):
                 return indice
         return -1
 
+    def _adicionar_documento_imagem(
+        self,
+        caminho: str,
+        imagem_bgr: np.ndarray,
+        nome_aba: str | None = None,
+        tooltip: str | None = None,
+        modificado: bool = False,
+        mensagem_status: str | None = None,
+    ) -> DocumentoImagem:
+        """Cria uma aba editável para uma imagem já carregada em memória."""
+        self._imagem_atual = imagem_bgr
+        novo_documento = DocumentoImagem(caminho, imagem_bgr)
+        novo_documento.zoom_alterado.connect(self._ao_zoom_alterado)
+
+        titulo_aba = nome_aba or os.path.basename(caminho) or "Imagem"
+        aba_atual = self.tabs.currentWidget()
+        if isinstance(aba_atual, TelaBoasVindas):
+            indice_insercao = self.tabs.currentIndex()
+            self.tabs.removeTab(indice_insercao)
+            aba_atual.deleteLater()
+            self.tabs.insertTab(indice_insercao, novo_documento, titulo_aba)
+        else:
+            indice_insercao = self.tabs.addTab(novo_documento, titulo_aba)
+
+        self.tabs.setTabToolTip(indice_insercao, tooltip or titulo_aba)
+        self._adicionar_botao_fechar_aba(indice_insercao, novo_documento)
+        self.tabs.setCurrentIndex(indice_insercao)
+
+        self._ao_ferramenta_alterada(self._ferramenta_ativa_toolbar)
+        self._stacked.setCurrentIndex(1)
+        self._atualizar_visibilidade_laterais(True)
+
+        if modificado:
+            self._marcar_como_modificado(novo_documento, True)
+
+        if mensagem_status:
+            self.statusBar().showMessage(mensagem_status)
+
+        return novo_documento
+
     def _carregar_imagem_do_caminho(self, caminho: str) -> None:
         """Carrega uma imagem a partir do caminho informado e adiciona como uma nova aba."""
         indice_existente = self._indice_aba_por_caminho(caminho)
@@ -792,36 +832,15 @@ class JanelaPrincipal(QMainWindow):
             QMessageBox.critical(self, "Erro", f"Não foi possível abrir:\n{caminho}")
             return
 
-        self._imagem_atual = imagem_bgr
-        # Instancia o documento com a imagem carregada
-        novo_documento = DocumentoImagem(caminho, imagem_bgr)
-        novo_documento.zoom_alterado.connect(self._ao_zoom_alterado)
-        
         # Extrai apenas o nome do arquivo para exibir na aba
         nome_arquivo = os.path.basename(caminho)
-        
-        # Adiciona a aba com o nome do arquivo
-        aba_atual = self.tabs.currentWidget()
-        if isinstance(aba_atual, TelaBoasVindas):
-            indice_insercao = self.tabs.currentIndex()
-            self.tabs.removeTab(indice_insercao)
-            aba_atual.deleteLater()
-            self.tabs.insertTab(indice_insercao, novo_documento, nome_arquivo)
-        else:
-            indice_insercao = self.tabs.addTab(novo_documento, nome_arquivo)
-            
-        self.tabs.setTabToolTip(indice_insercao, nome_arquivo)
-        self._adicionar_botao_fechar_aba(indice_insercao, novo_documento)
-        self.tabs.setCurrentIndex(indice_insercao)
-
-        # Reaplica a ferramenta atual no visualizador da nova aba
-        self._ao_ferramenta_alterada(self._ferramenta_ativa_toolbar)
-
-        # Alterna o QStackedWidget para mostrar a página de abas (Página 1)
-        self._stacked.setCurrentIndex(1)
-        self._atualizar_visibilidade_laterais(True)
-
-        self.statusBar().showMessage(f"Imagem carregada: {nome_arquivo}")
+        self._adicionar_documento_imagem(
+            caminho,
+            imagem_bgr,
+            nome_aba=nome_arquivo,
+            tooltip=nome_arquivo,
+            mensagem_status=f"Imagem carregada: {nome_arquivo}",
+        )
 
     def abrir_nova_aba(self) -> None:
         """Abre uma nova aba em branco contendo as opções iniciais."""
@@ -855,6 +874,10 @@ class JanelaPrincipal(QMainWindow):
             return
 
         nome_arquivo = os.path.basename(aba.caminho)
+
+        if not aba.foi_modificado:
+            self._fechar_aba_confirmada(indice, aba, nome_arquivo)
+            return
 
         if not self._mostrar_aviso_fechamento:
             self._fechar_aba_confirmada(indice, aba, nome_arquivo)
@@ -942,6 +965,31 @@ class JanelaPrincipal(QMainWindow):
             self.tabs.setTabText(indice, nome_arquivo)
             self.tabs.setTabToolTip(indice, nome_arquivo)
         self.tabs.tabBar().updateGeometry()
+
+    def _extensao_por_filtro_salvamento(self, filtro: str) -> str:
+        if "JPG" in filtro or "JPEG" in filtro:
+            return ".jpg"
+        if "BMP" in filtro:
+            return ".bmp"
+        return _EXTENSAO_PADRAO_SALVAMENTO
+
+    def _normalizar_caminho_salvamento(
+        self, caminho: str, filtro_selecionado: str
+    ) -> str | None:
+        _raiz, extensao = os.path.splitext(caminho)
+        if not extensao:
+            return caminho + self._extensao_por_filtro_salvamento(filtro_selecionado)
+
+        if extensao.lower() not in _EXTENSOES_SALVAMENTO:
+            formatos = ", ".join(sorted(_EXTENSOES_SALVAMENTO))
+            QMessageBox.warning(
+                self,
+                "Formato não suportado",
+                f"Use uma das extensões suportadas: {formatos}.",
+            )
+            return None
+
+        return caminho
     
     def salvar_imagem(self) -> None:
         """Salva a imagem da aba atual em arquivo."""
@@ -950,7 +998,7 @@ class JanelaPrincipal(QMainWindow):
             QMessageBox.information(self, "Aviso", "Nenhuma imagem para salvar.")
             return
 
-        caminho, _ = QFileDialog.getSaveFileName(
+        caminho, filtro_selecionado = QFileDialog.getSaveFileName(
             self,
             "Salvar imagem",
             aba_atual.caminho,
@@ -960,11 +1008,26 @@ class JanelaPrincipal(QMainWindow):
         if not caminho:
             return
 
-        sucesso = cv2.imwrite(caminho, aba_atual.imagem_atual)
+        caminho_normalizado = self._normalizar_caminho_salvamento(
+            caminho, filtro_selecionado
+        )
+        if caminho_normalizado is None:
+            return
+
+        try:
+            sucesso = cv2.imwrite(caminho_normalizado, aba_atual.imagem_atual)
+        except cv2.error as erro:
+            QMessageBox.critical(
+                self,
+                "Erro",
+                "Não foi possível salvar a imagem.\n\n"
+                f"Detalhes: {erro}",
+            )
+            return
 
         if sucesso:
-            aba_atual.caminho = caminho
-            self.statusBar().showMessage(f"Imagem salva em: {caminho}")
+            aba_atual.caminho = caminho_normalizado
+            self.statusBar().showMessage(f"Imagem salva em: {caminho_normalizado}")
             self._marcar_como_modificado(aba_atual, False)
         else:
             QMessageBox.critical(self, "Erro", "Falha ao salvar a imagem.")
@@ -995,40 +1058,17 @@ class JanelaPrincipal(QMainWindow):
         arr_rgb = arr_rgb.reshape((altura, largura, 3))
         imagem_bgr = cv2.cvtColor(arr_rgb, cv2.COLOR_RGB2BGR)
 
-        self._imagem_atual = imagem_bgr
-        # Gera um nome genérico para a nova aba
         contador = self.tabs.count() + 1
         nome_arquivo = f"Clipboard_{contador}"
-        caminho_ficticio = f"/{nome_arquivo}" # Caminho fictício, pois ainda não existe no disco
-        
-        # Instancia o documento de imagem
-        novo_documento = DocumentoImagem(caminho_ficticio, imagem_bgr)
-        novo_documento.zoom_alterado.connect(self._ao_zoom_alterado)
-        # Adiciona a aba com o nome
-        aba_atual = self.tabs.currentWidget()
-        if isinstance(aba_atual, TelaBoasVindas):
-            indice_insercao = self.tabs.currentIndex()
-            self.tabs.removeTab(indice_insercao)
-            aba_atual.deleteLater()
-            self.tabs.insertTab(indice_insercao, novo_documento, nome_arquivo)
-        else:
-            indice_insercao = self.tabs.addTab(novo_documento, nome_arquivo)
-            
-        self.tabs.setTabToolTip(indice_insercao, "Imagem colada (Não salva)")
-        self._adicionar_botao_fechar_aba(indice_insercao, novo_documento)
-        self.tabs.setCurrentIndex(indice_insercao)
-
-        # Reaplica a ferramenta atual no visualizador da nova aba
-        self._ao_ferramenta_alterada(self._ferramenta_ativa_toolbar)
-
-        # Alterna o QStackedWidget para mostrar a página de abas (Página 1)
-        self._stacked.setCurrentIndex(1)
-        self._atualizar_visibilidade_laterais(True)
-        
-        # Marca como modificado para forçar o asterisco e indicar que o arquivo precisa ser salvo
-        self._marcar_como_modificado(novo_documento, True)
-
-        self.statusBar().showMessage("Imagem colada do clipboard.")
+        caminho_ficticio = f"/{nome_arquivo}"
+        self._adicionar_documento_imagem(
+            caminho_ficticio,
+            imagem_bgr,
+            nome_aba=nome_arquivo,
+            tooltip="Imagem colada (Não salva)",
+            modificado=True,
+            mensagem_status="Imagem colada do clipboard.",
+        )
 
     # ------------------------------------------------------------------
     # Integração com Plugins
@@ -1065,18 +1105,31 @@ class JanelaPrincipal(QMainWindow):
     def capturar_da_camera(self) -> None:
         """Abre a janela de preview e captura a imagem ao confirmar."""
         dialogo = DialogoCamera(self)
-        
-        # Se o usuário clicar em "Tirar Foto" (accept)
-        if dialogo.exec() == QDialog.DialogCode.Accepted:
-            frame = dialogo.get_frame()
-            if frame is not None:
-                self._imagem_atual = frame
-                self._stacked.setCurrentIndex(1)
-                self._exibir_imagem(self._imagem_atual, ajustar_a_janela=True)
-                self.statusBar().showMessage("Imagem capturada via Live Preview.")
-        
-        # Garante que a câmera seja liberada mesmo se o diálogo for fechado
-        dialogo.cap.release()
+        try:
+            # Se o usuário clicar em "Tirar Foto" (accept)
+            if dialogo.exec() == QDialog.DialogCode.Accepted:
+                frame = dialogo.get_frame()
+                if frame is None:
+                    QMessageBox.warning(
+                        self,
+                        "Captura da câmera",
+                        "Nenhum frame foi capturado pela câmera.",
+                    )
+                    return
+
+                contador = self.tabs.count() + 1
+                nome_arquivo = f"Captura_Camera_{contador}"
+                caminho_ficticio = f"/{nome_arquivo}.png"
+                self._adicionar_documento_imagem(
+                    caminho_ficticio,
+                    frame,
+                    nome_aba=nome_arquivo,
+                    tooltip="Imagem capturada da câmera (Não salva)",
+                    modificado=True,
+                    mensagem_status="Imagem capturada via Live Preview.",
+                )
+        finally:
+            dialogo.liberar_camera()
 
     # ------------------------------------------------------------------
     # Slots privados
@@ -1103,7 +1156,7 @@ class JanelaPrincipal(QMainWindow):
         """
         # Salva estado atual antes da alteração
         if aba.imagem_atual is not None:
-            self._historico.salvar(aba.imagem_atual.copy())
+            aba.historico.salvar(aba.imagem_atual.copy())
 
         imagem_bgr = cv2.cvtColor(imagem_rgb, cv2.COLOR_RGB2BGR)
 
@@ -1132,7 +1185,7 @@ class JanelaPrincipal(QMainWindow):
         if not isinstance(aba_atual, DocumentoImagem):
             return
 
-        estado = self._historico.desfazer()
+        estado = aba_atual.historico.desfazer()
 
         if estado is None:
             self.statusBar().showMessage("Nada para desfazer.")
@@ -1324,6 +1377,31 @@ class JanelaPrincipal(QMainWindow):
     # ------------------------------------------------------------------
     # Utilitários de exibição
     # ------------------------------------------------------------------
+
+    def _gerar_icone_miniatura(self, imagem_bgr: np.ndarray) -> QIcon:
+        if imagem_bgr is None or imagem_bgr.size == 0:
+            return QIcon()
+
+        try:
+            imagem_rgb = cv2.cvtColor(imagem_bgr, cv2.COLOR_BGR2RGB)
+            altura, largura, canais = imagem_rgb.shape
+            bytes_por_linha = canais * largura
+            qimage = QImage(
+                imagem_rgb.data,
+                largura,
+                altura,
+                bytes_por_linha,
+                QImage.Format.Format_RGB888,
+            ).copy()
+            pixmap = QPixmap.fromImage(qimage).scaled(
+                32,
+                32,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            return QIcon(pixmap)
+        except (cv2.error, ValueError):
+            return QIcon()
 
     def _exibir_imagem(self, imagem_bgr: np.ndarray, ajustar_a_janela: bool = False) -> None:
         """
