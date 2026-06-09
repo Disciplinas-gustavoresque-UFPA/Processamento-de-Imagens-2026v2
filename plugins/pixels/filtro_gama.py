@@ -26,7 +26,6 @@ class FiltroGama(PluginBase):
         rotulo_titulo = QLabel("Gama:", self)
         layout_principal.addWidget(rotulo_titulo)
 
-        # Slider inteiro 10..300 mapeado para gama 0.10..3.00 (centro 1.00).
         self._slider = QSlider(Qt.Orientation.Horizontal, self)
         self._slider.setRange(10, 300)
         self._slider.setValue(100)
@@ -52,7 +51,6 @@ class FiltroGama(PluginBase):
         self.setLayout(layout_principal)
         self.setMinimumWidth(320)
 
-        # preview inicial após a interface estar pronta
         QTimer.singleShot(100, self._emitir_preview)
 
     def _gama(self) -> float:
@@ -61,7 +59,6 @@ class FiltroGama(PluginBase):
     def processar(self, imagem: np.ndarray) -> np.ndarray:
         gama = self._gama()
 
-        # Tabela de consulta (LUT): pré-calcula o mapeamento dos 256 níveis.
         indices = np.arange(256, dtype=np.float32) / 255.0
         lut = np.clip(np.power(indices, 1.0 / gama) * 255.0, 0, 255).astype(np.uint8)
 
