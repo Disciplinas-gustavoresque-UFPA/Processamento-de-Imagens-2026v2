@@ -1,0 +1,98 @@
+QFrame#rightSidebar {
+    background-color: #1e1e1e;
+    border-left: 1px solid #1a1a1a;
+}
+
+QToolButton#sidebarToggleButton {
+    min-width: 16px;
+    max-width: 16px;
+    min-height: 16px;
+    max-height: 16px;
+    border: none;
+    border-radius: 4px;
+    color: #d1d5db;
+    background-color: transparent;
+    padding: 0px;
+    margin: 2px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+QToolButton#sidebarToggleButton:hover {
+    background-color: #2c2c2c;
+}
+
+QFrame#rightTabsRow, QFrame#rightLayersHeader, QFrame#adjustmentsHeader {
+    background-color: #2c2c2c;
+}
+
+QPushButton#rightTabButton {
+    border: none;
+    color: #d1d5db;
+    background-color: transparent;
+    padding: 6px 10px;
+    font-size: 11px;
+}
+
+QPushButton#rightTabButton:hover {
+    background-color: #3c3c3c;
+}
+
+QPushButton#rightTabButton:checked {
+    background-color: #3c3c3c;
+}
+
+QLabel#rightSectionTitle {
+    color: #f3f4f6;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+QLabel#rightSubtleText {
+    color: #9ca3af;
+    font-size: 11px;
+}
+
+QComboBox#rightCombo,
+QLineEdit#rightInput {
+    background-color: #3c3c3c;
+    color: #ffffff;
+    border: 1px solid #1a1a1a;
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 11px;
+}
+
+QToolButton#adjustmentIconButton {
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    border: none;
+    border-radius: 4px;
+    background-color: #3c3c3c;
+}
+
+QToolButton#adjustmentIconButton:hover {
+    background-color: #4c4c4c;
+}
+
+QFrame#layerItem {
+    border-radius: 4px;
+    background-color: #3c6e9f;
+}
+
+QToolButton#layerControlButton {
+    min-width: 24px;
+    max-width: 24px;
+    min-height: 24px;
+    max-height: 24px;
+    border: none;
+    border-radius: 4px;
+    color: #d1d5db;
+    background-color: transparent;
+}
+
+QToolButton#layerControlButton:hover {
+    background-color: #3c3c3c;
+}
