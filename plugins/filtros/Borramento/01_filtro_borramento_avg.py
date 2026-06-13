@@ -153,7 +153,7 @@ class FiltroBlur(PluginBase):
         intensidade = self._obter_parametros()
         
         self._rotulo_intensidade.setText(
-            f"Intensidade: {intensidade}"
+            f"Intensidade: {intensidade}" 
         )
         
         imagem_processada = self.processar(self.imagem_original)
