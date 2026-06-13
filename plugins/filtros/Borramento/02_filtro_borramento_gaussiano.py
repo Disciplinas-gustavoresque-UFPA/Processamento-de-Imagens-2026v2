@@ -21,32 +21,20 @@ from core.plugin_base import PluginBase
 class FiltroBlur(PluginBase):
     """Plugin para aplicar borramento na imagem."""
     
-    display_name = "Borramento (Blur)"
+    display_name = "Gaussiano"
     
     def setup_ui(self) -> None:
         """Cria a interface do plugin."""
         layout_principal = QVBoxLayout(self)
         
-        # --- Tipo de borramento ---
-        rotulo_tipo = QLabel("Tipo de borramento:", self)
-        layout_principal.addWidget(rotulo_tipo)
-        
-        self._combo_tipo = QComboBox(self)
-        self._combo_tipo.addItems([
-            "Média (Blur)",
-            "Gaussiano",
-            "Mediana"
-        ])
-        layout_principal.addWidget(self._combo_tipo)
-        
         # --- Intensidade do borramento ---
-        self._rotulo_intensidade = QLabel("Intensidade (tamanho do kernel): 3", self)
-        self._rotulo_intensidade.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._rotulo_intensidade = QLabel("Intensidade: 3", self)
+        self._rotulo_intensidade.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout_principal.addWidget(self._rotulo_intensidade)
         
         self._slider_intensidade = QSlider(Qt.Orientation.Horizontal, self)
         self._slider_intensidade.setMinimum(1)
-        self._slider_intensidade.setMaximum(15)
+        self._slider_intensidade.setMaximum(30)
         self._slider_intensidade.setValue(3)
         self._slider_intensidade.setTickInterval(2)
         self._slider_intensidade.setTickPosition(QSlider.TickPosition.TicksBelow)
@@ -62,23 +50,63 @@ class FiltroBlur(PluginBase):
         
         # --- Conexões ---
         self._slider_intensidade.valueChanged.connect(self._ao_mudar_parametro)
-        self._combo_tipo.currentIndexChanged.connect(self._ao_mudar_parametro)
         self._btn_aplicar.clicked.connect(self._ao_aplicar)
         self._btn_cancelar.clicked.connect(self.reject)
         
         self.setLayout(layout_principal)
-        self.setMinimumWidth(350)
+        self.setMinimumWidth(450)
+        self.setContentsMargins(10, 10, 10, 10)
+        self.setStyleSheet("""
+                           
+            QLabel {
+                           font-size: 15px
+            }
+            QSlider::groove:horizontal {
+                height: 8px;
+                background: #d8dce3;
+                border-radius: 4px;
+            }
+
+            QSlider::sub-page:horizontal {
+                background: #3b82f6;
+                border-radius: 4px;
+            }
+
+            QSlider::add-page:horizontal {
+                background: #d8dce3;
+                border-radius: 4px;
+            }
+
+            QSlider::handle:horizontal {
+                background: white;
+                border: 2px solid #3b82f6;
+                width: 20px;
+                height: 20px;
+                margin: -7px 0;
+                border-radius: 10px;
+            }
+            
+
+            QSlider::handle:horizontal:hover {
+                background: #eff6ff;
+            }
+
+            QSlider::handle:horizontal:pressed {
+                background: #dbeafe;
+            }
+            """)
+        # self.setMinimumHeight(350)
     
-    def _obter_parametros(self) -> tuple[str, int]:
-        """Retorna o tipo e intensidade do borramento."""
-        tipo = self._combo_tipo.currentText()
+    def _obter_parametros(self) -> tuple[str, int]:      
+
         intensidade = self._slider_intensidade.value()
-        
+
         # Garantir que o kernel seja ímpar (requerido pelo OpenCV)
         if intensidade % 2 == 0:
             intensidade += 1
         
-        return tipo, intensidade 
+        # return intensidade 
+        return intensidade 
     
     def processar(self, imagem: np.ndarray) -> np.ndarray:
         """
@@ -96,21 +124,24 @@ class FiltroBlur(PluginBase):
         """
         import cv2
         
-        tipo, intensidade = self._obter_parametros()
+        intensidade = self._obter_parametros()
         
         # Converter para BGR (OpenCV usa BGR)
         imagem_bgr = cv2.cvtColor(imagem, cv2.COLOR_RGB2BGR)
         
         # Aplicar o tipo de borramento
-        if tipo == "Média (Blur)":
-            kernel = (intensidade, intensidade)
-            resultado_bgr = cv2.blur(imagem_bgr, kernel)
-        elif tipo == "Gaussiano":
-            kernel = (intensidade, intensidade)
-            resultado_bgr = cv2.GaussianBlur(imagem_bgr, kernel, 0)
-        else:  # Mediana
-            # Mediana requer kernel ímpar, já garantido pelo _obter_parametros
-            resultado_bgr = cv2.medianBlur(imagem_bgr, intensidade)
+        # if tipo == "Média (Blur)":
+        #     kernel = (intensidade, intensidade)
+        #     resultado_bgr = cv2.blur(imagem_bgr, kernel)
+        # elif tipo == "Gaussiano":
+        #     kernel = (intensidade, intensidade)
+        #     resultado_bgr = cv2.GaussianBlur(imagem_bgr, kernel, 0)
+        # else:  # Mediana
+        #     # Mediana requer kernel ímpar, já garantido pelo _obter_parametros
+        #     resultado_bgr = cv2.medianBlur(imagem_bgr, intensidade)
+
+        kernel = (intensidade, intensidade)
+        resultado_bgr = cv2.GaussianBlur(imagem_bgr, kernel, 0)
         
         # Converter de volta para RGB
         resultado_rgb = cv2.cvtColor(resultado_bgr, cv2.COLOR_BGR2RGB)
@@ -119,13 +150,12 @@ class FiltroBlur(PluginBase):
     
     def _ao_mudar_parametro(self, _valor=None) -> None:
         """Atualiza rótulos e emite preview."""
-        tipo, intensidade = self._obter_parametros()
+        intensidade = self._obter_parametros()
         
         self._rotulo_intensidade.setText(
-            f"Intensidade (tamanho do kernel): {intensidade}"
+            f"Intensidade: {intensidade}"
         )
         
-        # Emitir preview
         imagem_processada = self.processar(self.imagem_original)
         self.preview_requested.emit(imagem_processada)
     

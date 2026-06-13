@@ -697,13 +697,13 @@ class JanelaPrincipal(QMainWindow):
 
         # --- Menus de plugins (populados dinamicamente) ---
         # --- Menu Imagem (transformações e ajustes globais) ---
-        menu_imagem = barra.addMenu("Imagem")
-        diretorio_imagem = os.path.join(_DIRETORIO_RAIZ, "plugins", "imagem")
-        carregar_plugins_dinamicamente(menu_imagem, diretorio_imagem, self)
+        # menu_imagem = barra.addMenu("Imagem")
+        # diretorio_imagem = os.path.join(_DIRETORIO_RAIZ, "plugins", "imagem")
+        # carregar_plugins_dinamicamente(menu_imagem, diretorio_imagem, self)
 
-        if not _menu_tem_acao_folha(menu_imagem):
-            aviso = menu_imagem.addAction("(nenhum plugin encontrado)")
-            aviso.setEnabled(False)
+        # if not _menu_tem_acao_folha(menu_imagem):
+        #     aviso = menu_imagem.addAction("(nenhum plugin encontrado)")
+        #     aviso.setEnabled(False)
 
         # --- Menu Pixels (operações pontuais) ---
         menu_pixels = barra.addMenu("Pixels")
