@@ -1,0 +1,1 @@
+"""Plugins da categoria Imagem."""
