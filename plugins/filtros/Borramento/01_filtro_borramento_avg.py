@@ -21,7 +21,7 @@ from core.plugin_base import PluginBase
 class FiltroBlur(PluginBase):
     """Plugin para aplicar borramento na imagem."""
     
-    display_name = "Gaussiano"
+    display_name = "Média"
     
     def setup_ui(self) -> None:
         """Cria a interface do plugin."""
@@ -141,7 +141,7 @@ class FiltroBlur(PluginBase):
         #     resultado_bgr = cv2.medianBlur(imagem_bgr, intensidade)
 
         kernel = (intensidade, intensidade)
-        resultado_bgr = cv2.GaussianBlur(imagem_bgr, kernel, 0)
+        resultado_bgr = cv2.blur(imagem_bgr, kernel)
         
         # Converter de volta para RGB
         resultado_rgb = cv2.cvtColor(resultado_bgr, cv2.COLOR_BGR2RGB)
