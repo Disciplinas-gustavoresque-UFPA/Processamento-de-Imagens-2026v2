@@ -149,7 +149,7 @@ class FiltroBlur(PluginBase):
         return resultado_rgb
     
     def _ao_mudar_parametro(self, _valor=None) -> None:
-        """Atualiza rótulos e emite preview."""
+        """Atualiza rótulos e emite preview.""" 
         intensidade = self._obter_parametros()
         
         self._rotulo_intensidade.setText(
