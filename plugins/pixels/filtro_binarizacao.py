@@ -67,3 +67,35 @@ class FiltroBinarizacao(PluginBase):
         layout_botoes.addWidget(self._btn_aplicar)
         layout_botoes.addWidget(self._btn_cancelar)
         layout_principal.addLayout(layout_botoes)
+
+        # --- Conexões de Sinais (Eventos) ---
+        for radio in self._radios_metodo.values():
+            radio.toggled.connect(self._ao_alterar_parametros)
+
+        self._slider_limiar.valueChanged.connect(self._ao_mover_slider)
+        
+        self._btn_aplicar.clicked.connect(self._ao_aplicar)
+        self._btn_cancelar.clicked.connect(self.reject)
+
+        self.setLayout(layout_principal)
+        self.setMinimumWidth(320)
+
+
+    def _ao_mover_slider(self, valor: int) -> None:
+        """Atualiza o texto da interface quando o slider é movimentado."""
+        self._rotulo_limiar.setText(f"Limiar (Threshold): {valor}")
+        self._ao_alterar_parametros(True)
+
+    def _ao_alterar_parametros(self, marcado: bool) -> None:
+        """Regera o processamento para mostrar o preview ao vivo no canvas."""
+        if not marcado:
+            return
+        # Utiliza a cópia da imagem enviada pelo construtor da PluginBase
+        imagem_processada = self.processar(self.imagem_original)
+        self.preview_requested.emit(imagem_processada)
+
+    def _ao_aplicar(self) -> None:
+        """Aplica o filtro na matriz oficial e adiciona ao histórico."""
+        imagem_processada = self.processar(self.imagem_original)
+        self.apply_requested.emit(imagem_processada)
+        self.accept()
