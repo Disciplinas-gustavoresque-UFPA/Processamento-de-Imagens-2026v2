@@ -12,7 +12,8 @@ bit 0, menos significativo) e visualizá-los de duas formas:
 * **Reconstrução** — mantém apenas os bits selecionados no seu peso original e
   zera os demais, evidenciando a contribuição daqueles planos para a imagem.
 
-A operação é feita sobre a intensidade em tons de cinza (clássico de Gonzalez).
+A operação pode ser feita sobre a intensidade em tons de cinza (clássico de
+Gonzalez) ou canal a canal sobre o RGB, preservando a cor.
 """
 
 import numpy as np
@@ -57,6 +58,17 @@ class VisualizacaoPlanosBits(PluginBase):
         # Começa com o bit mais significativo marcado para um preview imediato.
         self._checks_bit[7].setChecked(True)
 
+        # --- Domínio: tons de cinza ou por canal RGB ---
+        layout_principal.addWidget(QLabel("Domínio:", self))
+        self._grupo_dominio = QButtonGroup(self)
+        self._radios_dominio: dict[str, QRadioButton] = {}
+        for texto, valor in [("Tons de cinza", "cinza"), ("Por canal RGB", "rgb")]:
+            radio = QRadioButton(texto, self)
+            self._grupo_dominio.addButton(radio)
+            self._radios_dominio[valor] = radio
+            layout_principal.addWidget(radio)
+        self._radios_dominio["cinza"].setChecked(True)
+
         # --- Modo de exibição ---
         layout_principal.addWidget(QLabel("Modo de exibição:", self))
         self._grupo_modo = QButtonGroup(self)
@@ -85,7 +97,7 @@ class VisualizacaoPlanosBits(PluginBase):
 
         for check in self._checks_bit.values():
             check.toggled.connect(self._ao_mudar_controle)
-        for radio in self._radios_modo.values():
+        for radio in (*self._radios_dominio.values(), *self._radios_modo.values()):
             radio.toggled.connect(self._ao_mudar_controle)
 
         self.setLayout(layout_principal)
@@ -96,6 +108,9 @@ class VisualizacaoPlanosBits(PluginBase):
 
     def _bits_selecionados(self) -> list[int]:
         return [bit for bit, check in self._checks_bit.items() if check.isChecked()]
+
+    def _dominio(self) -> str:
+        return "rgb" if self._radios_dominio["rgb"].isChecked() else "cinza"
 
     def _modo(self) -> str:
         return "reconstrucao" if self._radios_modo["reconstrucao"].isChecked() else "binario"
@@ -116,10 +131,17 @@ class VisualizacaoPlanosBits(PluginBase):
         if mascara == 0:
             return np.zeros_like(imagem)
 
-        rgb = imagem[..., :3].astype(np.uint16)
-        cinza = np.rint((rgb[..., 0] + rgb[..., 1] + rgb[..., 2]) / 3.0).astype(np.uint8)
-        resultado = self._fatiar(cinza, mascara, self._modo())
-        return np.stack((resultado, resultado, resultado), axis=-1)
+        modo = self._modo()
+
+        if self._dominio() == "cinza":
+            rgb = imagem[..., :3].astype(np.uint16)
+            cinza = np.rint((rgb[..., 0] + rgb[..., 1] + rgb[..., 2]) / 3.0).astype(np.uint8)
+            resultado = self._fatiar(cinza, mascara, modo)
+            return np.stack((resultado, resultado, resultado), axis=-1)
+
+        saida = imagem.copy()
+        saida[..., :3] = self._fatiar(imagem[..., :3], mascara, modo)
+        return saida
 
     def _texto_status(self) -> str:
         bits = self._bits_selecionados()
