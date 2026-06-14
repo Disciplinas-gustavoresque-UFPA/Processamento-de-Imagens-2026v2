@@ -3,7 +3,9 @@ import numpy as np
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QHBoxLayout,
     QLabel,
+    QPushButton,
     QRadioButton,
     QSlider,
     QVBoxLayout,
@@ -57,3 +59,11 @@ class FiltroBinarizacao(PluginBase):
         layout_principal.addWidget(self._slider_limiar)
 
         layout_principal.addSpacing(10)
+
+        # --- Botões de Ação ---
+        layout_botoes = QHBoxLayout()
+        self._btn_aplicar = QPushButton("Aplicar", self)
+        self._btn_cancelar = QPushButton("Cancelar", self)
+        layout_botoes.addWidget(self._btn_aplicar)
+        layout_botoes.addWidget(self._btn_cancelar)
+        layout_principal.addLayout(layout_botoes)
