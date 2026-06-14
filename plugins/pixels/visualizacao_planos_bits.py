@@ -4,9 +4,13 @@ plugins/pixels/visualizacao_planos_bits.py
 Plugin de visualização de planos de bits (*bit-plane slicing*).
 
 Permite selecionar um ou mais planos de bit (do bit 7, mais significativo, ao
-bit 0, menos significativo) e visualizá-los como uma imagem binária: cada pixel
-fica branco (255) quando *algum* dos bits selecionados está ligado e preto (0)
-caso contrário.  Útil para inspecionar a contribuição de cada plano.
+bit 0, menos significativo) e visualizá-los de duas formas:
+
+* **Plano binário** — cada pixel fica branco (255) quando *algum* dos bits
+  selecionados está ligado e preto (0) caso contrário.  Útil para inspecionar
+  um plano isolado.
+* **Reconstrução** — mantém apenas os bits selecionados no seu peso original e
+  zera os demais, evidenciando a contribuição daqueles planos para a imagem.
 
 A operação é feita sobre a intensidade em tons de cinza (clássico de Gonzalez).
 """
@@ -14,11 +18,13 @@ A operação é feita sobre a intensidade em tons de cinza (clássico de Gonzale
 import numpy as np
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
+    QButtonGroup,
     QCheckBox,
     QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QRadioButton,
     QVBoxLayout,
 )
 
@@ -51,6 +57,17 @@ class VisualizacaoPlanosBits(PluginBase):
         # Começa com o bit mais significativo marcado para um preview imediato.
         self._checks_bit[7].setChecked(True)
 
+        # --- Modo de exibição ---
+        layout_principal.addWidget(QLabel("Modo de exibição:", self))
+        self._grupo_modo = QButtonGroup(self)
+        self._radios_modo: dict[str, QRadioButton] = {}
+        for texto, valor in [("Plano binário", "binario"), ("Reconstrução", "reconstrucao")]:
+            radio = QRadioButton(texto, self)
+            self._grupo_modo.addButton(radio)
+            self._radios_modo[valor] = radio
+            layout_principal.addWidget(radio)
+        self._radios_modo["binario"].setChecked(True)
+
         self._rotulo_status = QLabel(self)
         self._rotulo_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout_principal.addWidget(self._rotulo_status)
@@ -68,6 +85,8 @@ class VisualizacaoPlanosBits(PluginBase):
 
         for check in self._checks_bit.values():
             check.toggled.connect(self._ao_mudar_controle)
+        for radio in self._radios_modo.values():
+            radio.toggled.connect(self._ao_mudar_controle)
 
         self.setLayout(layout_principal)
         self.setMinimumWidth(320)
@@ -77,6 +96,15 @@ class VisualizacaoPlanosBits(PluginBase):
 
     def _bits_selecionados(self) -> list[int]:
         return [bit for bit, check in self._checks_bit.items() if check.isChecked()]
+
+    def _modo(self) -> str:
+        return "reconstrucao" if self._radios_modo["reconstrucao"].isChecked() else "binario"
+
+    def _fatiar(self, canais: np.ndarray, mascara: int, modo: str) -> np.ndarray:
+        """Aplica o fatiamento de bits a um array uint8 (qualquer formato)."""
+        if modo == "binario":
+            return np.where((canais & mascara) > 0, 255, 0).astype(np.uint8)
+        return (canais & mascara).astype(np.uint8)
 
     def processar(self, imagem: np.ndarray) -> np.ndarray:
         bits = self._bits_selecionados()
@@ -90,7 +118,7 @@ class VisualizacaoPlanosBits(PluginBase):
 
         rgb = imagem[..., :3].astype(np.uint16)
         cinza = np.rint((rgb[..., 0] + rgb[..., 1] + rgb[..., 2]) / 3.0).astype(np.uint8)
-        resultado = np.where((cinza & mascara) > 0, 255, 0).astype(np.uint8)
+        resultado = self._fatiar(cinza, mascara, self._modo())
         return np.stack((resultado, resultado, resultado), axis=-1)
 
     def _texto_status(self) -> str:
@@ -98,7 +126,7 @@ class VisualizacaoPlanosBits(PluginBase):
         if not bits:
             return "Nenhum plano selecionado"
         lista = ", ".join(str(bit) for bit in sorted(bits, reverse=True))
-        return f"Planos: {lista}"
+        return f"Planos: {lista}  |  {self._radios_modo[self._modo()].text()}"
 
     def _emitir_preview(self) -> None:
         self._rotulo_status.setText(self._texto_status())
