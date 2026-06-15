@@ -81,6 +81,9 @@ class FiltroBinarizacao(PluginBase):
         self.setLayout(layout_principal)
         self.setMinimumWidth(320)
 
+        # Dispara o preview logo ao abrir a janela
+        self._ao_alterar_parametros(True)
+
     def _obter_metodo(self) -> str:
         """Verifica qual rádio button está marcado e retorna a sua chave."""
         for valor, radio in self._radios_metodo.items():
