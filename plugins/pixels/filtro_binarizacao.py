@@ -22,6 +22,7 @@ class FiltroBinarizacao(PluginBase):
     # ------------------------------------------------------------------
 
     def setup_ui(self) -> None:
+        """Cria o slider de seleção do limiar (threshold), opções de canalRGB e os botões Aplicar/Cancelar."""
         layout_principal = QVBoxLayout(self)
         
         # --- Seleção da Origem da Imagem ---
@@ -80,6 +81,38 @@ class FiltroBinarizacao(PluginBase):
         self.setLayout(layout_principal)
         self.setMinimumWidth(320)
 
+    def _obter_metodo(self) -> str:
+        """Verifica qual rádio button está marcado e retorna a sua chave."""
+        for valor, radio in self._radios_metodo.items():
+            if radio.isChecked():
+                return valor
+        return "media"
+
+    def processar(self, imagem: np.ndarray) -> np.ndarray:
+        """Lógica matemática executada a cada alteração nos controles."""
+        metodo = self._obter_metodo()
+        limiar = self._slider_limiar.value()
+
+        # O app.py envia a imagem no formato RGB.
+        # Extraí o canal escolhido via slicing:
+        if metodo == "r":
+            canal_base = imagem[..., 0]
+        elif metodo == "g":
+            canal_base = imagem[..., 1]
+        elif metodo == "b":
+            canal_base = imagem[..., 2]
+        else:
+            # Média RGB: calcula a média através do eixo de cor (axis=2)
+            # e converte de float de volta para inteiro (uint8)
+            canal_base = np.mean(imagem, axis=2).astype(np.uint8)
+
+        # Aplica a binarização utilizando a função nativa do OpenCV
+        # cv2.threshold retorna a tupla (limiar_aplicado, imagem_binarizada)
+        _, img_bin = cv2.threshold(canal_base, limiar, 255, cv2.THRESH_BINARY)
+
+        # O motor de renderização principal (app.py) espera uma imagem com 3 dimensões (RGB).
+        # Empilha o resultado binário (1 canal) nos três canais finais
+        return np.stack((img_bin, img_bin, img_bin), axis=-1)
 
     def _ao_mover_slider(self, valor: int) -> None:
         """Atualiza o texto da interface quando o slider é movimentado."""
