@@ -1,3 +1,19 @@
+"""
+plugins/pixels/filtro_binarizacao.py
+-----------------------------------------
+Plugin de exemplo: binarização interativa de imagens via slider.
+
+A implementação segue três etapas:
+
+1) Seleção do canal base da imagem RGB de entrada (Canal R, Canal G, Canal B ou a Média dos 3).
+2) Conversão do canal escolhido para tons de cinza.
+3) Aplicação do threshold para separar os pixels em dois grupos: pretos (0) e brancos (255) baseado no valor de limiar.
+
+Onde:
+* O método de extração pode ser R, G, B ou Média RGB.
+* Limiar (threshold) está no intervalo [0, 255].
+"""
+
 import cv2
 import numpy as np
 from PySide6.QtCore import Qt
