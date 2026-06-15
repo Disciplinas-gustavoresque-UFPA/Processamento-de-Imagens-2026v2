@@ -199,7 +199,7 @@ def _carregar_classes_do_arquivo(caminho_arquivo: str) -> list[type]:
 
 def _formatar_nome_menu(nome_pasta: str) -> str:
     """Retorna o nome da pasta sem alterações para uso no submenu."""
-    return nome_pasta
+    return nome_pasta.capitalize()
 
 
 def carregar_plugins_dinamicamente(
