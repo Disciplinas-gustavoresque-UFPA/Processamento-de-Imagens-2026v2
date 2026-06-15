@@ -653,6 +653,7 @@ class JanelaPrincipal(QMainWindow):
         menu_arquivo.addSeparator()
         
         acao_abrir = menu_arquivo.addAction("Abrir imagem")
+        acao_abrir.setShortcut("Ctrl+O")
         acao_abrir.triggered.connect(self.abrir_imagem)
 
         acao_camera = menu_arquivo.addAction("Capturar da Câmera")
@@ -660,11 +661,14 @@ class JanelaPrincipal(QMainWindow):
         acao_camera.triggered.connect(self.capturar_da_camera)
         
         acao_colar = menu_arquivo.addAction("Colar do clipboard")
+        acao_colar.setShortcut("Ctrl+V")
         acao_colar.triggered.connect(self.colar_imagem_clipboard)
 
         acao_salvar = menu_arquivo.addAction("Salvar imagem")
+        acao_salvar.setShortcut("Ctrl+S")
         acao_salvar.triggered.connect(self.salvar_imagem)
         menu_arquivo.addSeparator()
+
         acao_sair = menu_arquivo.addAction("Sair")
         acao_sair.triggered.connect(self.close)
         
