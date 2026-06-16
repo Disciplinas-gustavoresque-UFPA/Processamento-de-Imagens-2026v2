@@ -199,7 +199,7 @@ def _carregar_classes_do_arquivo(caminho_arquivo: str) -> list[type]:
 
 def _formatar_nome_menu(nome_pasta: str) -> str:
     """Retorna o nome da pasta sem alterações para uso no submenu."""
-    return nome_pasta
+    return nome_pasta.capitalize()
 
 
 def carregar_plugins_dinamicamente(
@@ -361,7 +361,7 @@ class TelaBoasVindas(QWidget):
         btn_nova = QPushButton("Nova Imagem")
         btn_nova.setFixedSize(130, 40)
 
-        btn_abrir = QPushButton("Abrir imagem…")
+        btn_abrir = QPushButton("Abrir imagem")
         btn_abrir.setFixedSize(130, 40)
         btn_abrir.clicked.connect(self.janela.abrir_imagem)
 
@@ -652,20 +652,23 @@ class JanelaPrincipal(QMainWindow):
         acao_nova_aba.triggered.connect(self.abrir_nova_aba)
         menu_arquivo.addSeparator()
         
-        acao_abrir = menu_arquivo.addAction("Abrir imagem…")
+        acao_abrir = menu_arquivo.addAction("Abrir imagem")
+        acao_abrir.setShortcut("Ctrl+O")
         acao_abrir.triggered.connect(self.abrir_imagem)
 
-        # NOVO: Adicionar opção de captura
         acao_camera = menu_arquivo.addAction("Capturar da Câmera")
         acao_camera.setShortcut("Ctrl+K")
         acao_camera.triggered.connect(self.capturar_da_camera)
         
         acao_colar = menu_arquivo.addAction("Colar do clipboard")
+        acao_colar.setShortcut("Ctrl+V")
         acao_colar.triggered.connect(self.colar_imagem_clipboard)
 
-        acao_salvar = menu_arquivo.addAction("Salvar imagem…")
+        acao_salvar = menu_arquivo.addAction("Salvar imagem")
+        acao_salvar.setShortcut("Ctrl+S")
         acao_salvar.triggered.connect(self.salvar_imagem)
         menu_arquivo.addSeparator()
+
         acao_sair = menu_arquivo.addAction("Sair")
         acao_sair.triggered.connect(self.close)
         
