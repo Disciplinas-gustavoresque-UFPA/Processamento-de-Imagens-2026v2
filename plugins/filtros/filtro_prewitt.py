@@ -7,7 +7,7 @@ from core.plugin_base import PluginBase
 
 
 class FiltroPrewitt(PluginBase):
-    display_name = "Deteccao de Borda (Prewitt)"
+    display_name = "Detecção de Borda (Prewitt)"
 
     def setup_ui(self) -> None:
         """Constroi os botoes e controles da janela flutuante."""
