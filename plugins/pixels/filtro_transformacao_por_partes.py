@@ -6,6 +6,10 @@ Plugin para Transformação Linear por Partes (Piecewise Linear Transformation).
 Implementa um gráfico interativo onde o usuário pode adicionar, mover e 
 remover pontos de controle. Inclui seleção de canal (RGB, R, G, B) com
 feedback visual de cores.
+
+A adição de pontos é feita pelo clique do botão esquerdo do mouse.
+A remoção de pontos é feita pelo clique do botão direito do mouse.
+A movimentação de pontos é feita pelo clique e arraste do mouse sobre o ponto.
 """
 
 import cv2
@@ -221,6 +225,10 @@ class FiltroPiecewise(PluginBase):
         layout_principal.addSpacing(10)
 
         # --- Gráfico ---
+        dica = QLabel("<b>Clique</b> para adicionar pontos. <b>Arraste</b> para ajustar.<br><b>Botão Direito</b> no ponto para remover.", self)
+        dica.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout_principal.addWidget(dica)
+
         layout_curva = QHBoxLayout()
         layout_curva.addStretch()
         self.widget_curva = WidgetCurvaInterativa(self)
