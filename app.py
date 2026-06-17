@@ -830,7 +830,8 @@ class JanelaPrincipal(QMainWindow):
             )
             return
 
-        imagem_bgr = cv2.imread(caminho)
+        # Lê o arquivo usando numpy e decodifica com OpenCV
+        imagem_bgr = cv2.imdecode(np.fromfile(caminho, dtype=np.uint8), cv2.IMREAD_COLOR)
         if imagem_bgr is None:
             QMessageBox.critical(self, "Erro", f"Não foi possível abrir:\n{caminho}")
             return
@@ -1018,8 +1019,15 @@ class JanelaPrincipal(QMainWindow):
             return
 
         try:
-            sucesso = cv2.imwrite(caminho_normalizado, aba_atual.imagem_atual)
-        except cv2.error as erro:
+            # Extrai a extensão para informar ao encoder (ex: '.png')
+            _, extensao = os.path.splitext(caminho_normalizado)
+            
+            # Codifica a imagem na memória e depois salva no disco com numpy
+            sucesso, buffer_imagem = cv2.imencode(extensao, aba_atual.imagem_atual)
+            if sucesso:
+                buffer_imagem.tofile(caminho_normalizado)
+                
+        except Exception as erro:
             QMessageBox.critical(
                 self,
                 "Erro",
