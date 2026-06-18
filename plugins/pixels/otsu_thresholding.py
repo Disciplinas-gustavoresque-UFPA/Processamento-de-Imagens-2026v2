@@ -38,22 +38,19 @@ class OtsuThresholding(PluginBase):
         # Habilita a quebra de linha automática (Word Wrap) para textos longos
         descricao.setWordWrap(True)
         
-        # Correção UI: Define que a caixa de texto pode expandir na horizontal e deve respeitar a altura mínima para não cortar
+        # Define que a caixa de texto pode expandir na horizontal e deve respeitar a altura mínima para não cortar
         descricao.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         
         # Insere a descrição no topo do layout vertical
         layout_principal.addWidget(descricao)
-
-        # --- Novo Bloco: Deixando explícito a falta de parâmetros personalizáveis ---
         
         # Adiciona um espaçamento visual (margem) de 10 pixels no layout
         layout_principal.addSpacing(10)
         
-        # Cria um novo rótulo usando formatação HTML básica (negrito e quebra de linha) para destacar a informação
+        # Cria um novo rótulo usando formatação HTML básica para destacar a informação
         info_parametros = QLabel(
-            "<b>Parâmetros Personalizáveis:</b><br>"
-            "<i>Nenhum.</i> O método de Otsu analisa o histograma da imagem "
-            "e encontra o ponto de corte perfeito de forma 100% automática.",
+            "O método de Otsu analisa o histograma da imagem "
+            "e encontra o ponto de corte perfeito de forma automática.",
             self
         )
         
@@ -66,8 +63,6 @@ class OtsuThresholding(PluginBase):
         
         # Cria um "espaço elástico" que empurra os textos para cima e os botões para baixo
         layout_principal.addStretch()
-        
-        # --------------------------------------------------------------------------
 
         # Cria um organizador horizontal para alocar os botões um ao lado do outro
         layout_botoes = QHBoxLayout()
@@ -102,7 +97,7 @@ class OtsuThresholding(PluginBase):
     # Método central onde a matemática matricial da imagem é manipulada
     def processar(self, imagem: np.ndarray) -> np.ndarray:
         
-        # 1. O Otsu exige que a imagem esteja em tons de cinza (matriz 2D, 1 canal de cor).
+        # O Otsu exige que a imagem esteja em tons de cinza (matriz 2D, 1 canal de cor).
         # Avalia o "shape" (dimensões da matriz). Se tiver 3 dimensões (Alt, Larg, Cor), indica que é colorida (RGB)
         if len(imagem.shape) == 3:
             # Usa a função do OpenCV para converter a matriz RGB (3 canais) para Cinza (1 canal)
@@ -111,7 +106,7 @@ class OtsuThresholding(PluginBase):
             # Se não possuir 3 dimensões, assume-se que já é uma imagem em tons de cinza
             imagem_cinza = imagem
             
-        # 2. Aplica o limiar matemático usando o algoritmo de Otsu.
+        # Aplica o limiar matemático usando o algoritmo de Otsu.
         # Parâmetros:
         # - imagem_cinza: A imagem de entrada.
         # - 0: O valor do limiar t (O OpenCV ignora esse número quando usamos a flag THRESH_OTSU).
@@ -121,11 +116,8 @@ class OtsuThresholding(PluginBase):
         t_ideal, imagem_binaria = cv2.threshold(
             imagem_cinza, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
         )
-        
-        # Opcional: Imprime no console (terminal) qual foi o valor de corte estatístico encontrado (útil para desenvolvedores)
-        print(f"Limiar ideal calculado por Otsu: {t_ideal}")
 
-        # 3. Preparação do retorno para o app.py
+        # Preparação do retorno para o app.py
         # O motor visual da aplicação (PySide6) espera uma matriz de 3 dimensões (RGB) para renderizar o Canvas.
         # Convertemos a imagem preta e branca (1 canal) de volta para o formato RGB (3 canais) repetindo os valores binários.
         return cv2.cvtColor(imagem_binaria, cv2.COLOR_GRAY2RGB)
