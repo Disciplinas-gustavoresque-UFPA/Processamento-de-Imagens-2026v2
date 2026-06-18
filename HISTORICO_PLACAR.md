@@ -102,3 +102,24 @@ Registro contínuo das métricas de engajamento, pontuações e badges atribuíd
 #### ⌨️ Jack Bauer do Código
 1. **@ygarasab** - 72 linhas
 
+## 📅 Semana de 15/06/2026
+
+### 📊 Métricas de Engajamento da Semana
+| Aluno | Issues Abertas | PRs Abertos | Comentários (Próprios) | Comentários (Outros) | Code Reviews |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **@Fbc00** | 0 | 3 | 0 | 0 | 4 |
+| **@alfa-m** | 0 | 1 | 0 | 1 | 1 |
+| **@ANDREMFEITOSA** | 0 | 1 | 1 | 0 | 0 |
+| **@antenoraires** | 0 | 0 | 0 | 2 | 0 |
+| **@ygarasab** | 0 | 1 | 0 | 0 | 0 |
+| **@polysamo** | 0 | 1 | 0 | 0 | 0 |
+| **@hug0mgs** | 0 | 1 | 0 | 0 | 0 |
+| **@mayaracunha-beep** | 0 | 1 | 0 | 0 | 0 |
+| **@Motaromc** | 0 | 0 | 1 | 0 | 0 |
+
+---
+
+### 🏆 Badges Conquistadas
+#### ⌨️ Jack Bauer do Código
+1. **@sayydaviid** - 1628 linhas
+
