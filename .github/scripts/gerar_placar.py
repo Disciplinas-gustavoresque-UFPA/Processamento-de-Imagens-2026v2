@@ -11,7 +11,10 @@ REPO_NAME = os.getenv('GITHUB_REPOSITORY').split('/')[1]
 PROFESSOR_USER = "gustavoresque"
 
 # Lista de usuários que NÃO devem aparecer no placar ou nas métricas
-IGNORE_USERS = ["gustavoresque", "copilot", "github-actions[bot]"]
+IGNORE_USERS = {"gustavoresque", "copilot", "github-actions[bot]"}
+
+def deve_ignorar(login):
+    return login.lower() in IGNORE_USERS
 
 BASE_URL = "https://api.github.com"
 HEADERS = {
@@ -71,7 +74,7 @@ def processar_dados(atividades, uma_semana_atras):
         eh_pr = 'pull_request' in item
         
         # 1. Conta criação de Issue ou PR (apenas se foi criado nos últimos 7 dias)
-        if item['created_at'] >= uma_semana_atras and autor_item not in IGNORE_USERS:
+        if item['created_at'] >= uma_semana_atras and not deve_ignorar(autor_item):
             if eh_pr:
                 engajamento[autor_item]["prs"] += 1
             else:
@@ -84,7 +87,7 @@ def processar_dados(atividades, uma_semana_atras):
             if res_pr.status_code == 200:
                 pr_data = res_pr.json()
                 if pr_data.get('merged_at') and pr_data['merged_at'] >= uma_semana_atras:
-                    if autor_item not in IGNORE_USERS:
+                    if not deve_ignorar(autor_item):
                         linhas = pr_data.get('additions', 0) + pr_data.get('deletions', 0)
                         data_badges["volume"][autor_item] += linhas
 
@@ -101,7 +104,7 @@ def processar_dados(atividades, uma_semana_atras):
                     match = re.search(REGEX_BADGE, comment.get('body', ''))
                     if match:
                         aluno_premiado = match.group(1)
-                        if aluno_premiado not in IGNORE_USERS:
+                        if not deve_ignorar(aluno_premiado):
                             badge_texto = match.group(2).strip()
                             for ranking_id, config in CONFIG_RANKINGS.items():
                                 if config['badge'] == badge_texto:
@@ -109,7 +112,7 @@ def processar_dados(atividades, uma_semana_atras):
                                     break
                 
                 # Conta métricas de comentário (próprio vs outros)
-                if autor_comentario not in IGNORE_USERS:
+                if not deve_ignorar(autor_comentario):
                     if autor_comentario == autor_item:
                         engajamento[autor_comentario]["com_proprio"] += 1
                     else:
@@ -129,7 +132,7 @@ def processar_dados(atividades, uma_semana_atras):
                         match = re.search(REGEX_BADGE, comment.get('body', ''))
                         if match:
                             aluno_premiado = match.group(1)
-                            if aluno_premiado not in IGNORE_USERS:
+                            if not deve_ignorar(aluno_premiado):
                                 badge_texto = match.group(2).strip()
                                 for ranking_id, config in CONFIG_RANKINGS.items():
                                     if config['badge'] == badge_texto:
@@ -137,13 +140,48 @@ def processar_dados(atividades, uma_semana_atras):
                                         break
                     
                     # Conta comentário como Code Review
-                    if autor_comentario not in IGNORE_USERS:
+                    if not deve_ignorar(autor_comentario):
                         engajamento[autor_comentario]["com_review"] += 1
 
     return data_badges, engajamento
 
-def atualizar_readme(data_badges):
-    """Atualiza o README apenas com as badges (pódio atual), mantendo o padrão."""
+def _detectar_newline(path):
+    """Detecta se o arquivo usa CRLF ou LF, pra preservar o estilo na escrita."""
+    with open(path, "rb") as f:
+        amostra = f.read(8192)
+    return "\r\n" if b"\r\n" in amostra else "\n"
+
+def ler_acumulado_historico():
+    """Lê o HISTORICO_PLACAR.md e retorna o total acumulado por aluno em cada ranking."""
+    acumulado = defaultdict(lambda: defaultdict(int))
+    if not os.path.exists("HISTORICO_PLACAR.md"):
+        return acumulado
+
+    titulo_para_id = {config["titulo"]: rid for rid, config in CONFIG_RANKINGS.items()}
+
+    with open("HISTORICO_PLACAR.md", "r", encoding="utf-8") as f:
+        conteudo = f.read()
+
+    ranking_atual = None
+    for linha in conteudo.split("\n"):
+        linha_strip = linha.strip()
+        m_titulo = re.match(r"^####\s+(.+)$", linha_strip)
+        if m_titulo:
+            ranking_atual = titulo_para_id.get(m_titulo.group(1).strip())
+            continue
+        if re.match(r"^#{1,3}\s", linha_strip):
+            ranking_atual = None
+            continue
+        if ranking_atual:
+            m = re.match(r"^\d+\.\s+\*\*@([\w-]+)\*\*\s+-\s+(\d+)", linha_strip)
+            if m:
+                acumulado[ranking_atual][m.group(1)] += int(m.group(2))
+
+    return acumulado
+
+def atualizar_readme(acumulado):
+    """Atualiza o README com o ranking acumulado lido do histórico completo."""
+    newline_readme = _detectar_newline("README.md")
     with open("README.md", "r", encoding="utf-8") as f:
         readme = f.read()
 
@@ -155,11 +193,11 @@ def atualizar_readme(data_badges):
     )
 
     for ranking_id, config in CONFIG_RANKINGS.items():
-        ranking_alunos = data_badges[ranking_id]
+        ranking_alunos = acumulado[ranking_id]
         titulo = config["titulo"]
 
         if not ranking_alunos:
-            texto_vencedores = "🥇 **Ainda não há registros nesta semana.**"
+            texto_vencedores = "🥇 **Ainda não há registros.**"
         else:
             sorted_alunos = sorted(ranking_alunos.items(), key=lambda item: item[1], reverse=True)
             top_aluno, top_score = sorted_alunos[0]
@@ -177,64 +215,74 @@ def atualizar_readme(data_badges):
         padrao = re.compile(rf"(### {re.escape(titulo)}.*?\n!\[.*?\]\(.*?\)\n+)(.*?)(?=\n+---)", re.DOTALL)
         readme = padrao.sub(f"\\g<1>{texto_vencedores}", readme)
 
-    with open("README.md", "w", encoding="utf-8") as f:
+    with open("README.md", "w", encoding="utf-8", newline=newline_readme) as f:
         f.write(readme)
     print("README.md atualizado com sucesso!")
 
 def atualizar_historico(data_badges, engajamento):
-    """Adiciona as métricas de engajamento e as badges no Histórico Semanal."""
+    """Adiciona/atualiza a seção da semana atual no HISTORICO_PLACAR.md (idempotente)."""
     data_formatada = datetime.now().strftime('%d/%m/%Y')
-    
+
     teve_pontuacao = any(len(alunos) > 0 for alunos in data_badges.values())
     teve_engajamento = len(engajamento) > 0
-    
+
     if not teve_pontuacao and not teve_engajamento:
         print("Nenhuma atividade nesta semana. Histórico não alterado.")
         return
 
-    md_historico = f"\n## 📅 Semana de {data_formatada}\n\n"
-    
-    # --- Nova Tabela de Engajamento ---
-    if teve_engajamento:
-        md_historico += "### 📊 Métricas de Engajamento da Semana\n"
-        md_historico += "| Aluno | Issues Abertas | PRs Abertos | Comentários (Próprios) | Comentários (Outros) | Code Reviews |\n"
-        md_historico += "| :--- | :---: | :---: | :---: | :---: | :---: |\n"
-        
-        # Ordena a tabela por quem teve o maior volume de interações totais
-        eng_ordenado = sorted(engajamento.items(), key=lambda x: sum(x[1].values()), reverse=True)
-        
-        for aluno, stats in eng_ordenado:
-            md_historico += f"| **@{aluno}** | {stats['issues']} | {stats['prs']} | {stats['com_proprio']} | {stats['com_outros']} | {stats['com_review']} |\n"
-        md_historico += "\n---\n\n"
+    md_secao = f"## 📅 Semana de {data_formatada}\n\n"
 
-    # --- Placar de Badges Tradicional ---
+    if teve_engajamento:
+        md_secao += "### 📊 Métricas de Engajamento da Semana\n"
+        md_secao += "| Aluno | Issues Abertas | PRs Abertos | Comentários (Próprios) | Comentários (Outros) | Code Reviews |\n"
+        md_secao += "| :--- | :---: | :---: | :---: | :---: | :---: |\n"
+        eng_ordenado = sorted(engajamento.items(), key=lambda x: sum(x[1].values()), reverse=True)
+        for aluno, stats in eng_ordenado:
+            md_secao += f"| **@{aluno}** | {stats['issues']} | {stats['prs']} | {stats['com_proprio']} | {stats['com_outros']} | {stats['com_review']} |\n"
+        md_secao += "\n---\n\n"
+
     if teve_pontuacao:
-        md_historico += "### 🏆 Badges Conquistadas\n"
+        md_secao += "### 🏆 Badges Conquistadas\n"
         for ranking_id, config in CONFIG_RANKINGS.items():
             ranking_alunos = data_badges[ranking_id]
             if not ranking_alunos:
                 continue
-                
-            md_historico += f"#### {config['titulo']}\n"
+            md_secao += f"#### {config['titulo']}\n"
             sorted_alunos = sorted(ranking_alunos.items(), key=lambda item: item[1], reverse=True)
-            
             for posicao, (aluno, score) in enumerate(sorted_alunos, start=1):
                 score_str = "linhas" if ranking_id == "volume" else "badges"
-                md_historico += f"{posicao}. **@{aluno}** - {score} {score_str}\n"
-            md_historico += "\n"
+                md_secao += f"{posicao}. **@{aluno}** - {score} {score_str}\n"
+            md_secao += "\n"
 
-    arquivo_existe = os.path.exists("HISTORICO_PLACAR.md")
-    with open("HISTORICO_PLACAR.md", "a", encoding="utf-8") as f:
-        if not arquivo_existe:
-            f.write("# 📚 Histórico Completo do Placar Semanal\n\n")
-            f.write("Registro contínuo das métricas de engajamento, pontuações e badges atribuídas.\n")
-        f.write(md_historico)
+    cabecalho = (
+        "# 📚 Histórico Completo do Placar Semanal\n\n"
+        "Registro contínuo das métricas de engajamento, pontuações e badges atribuídas.\n"
+    )
+
+    if os.path.exists("HISTORICO_PLACAR.md"):
+        newline_hist = _detectar_newline("HISTORICO_PLACAR.md")
+        with open("HISTORICO_PLACAR.md", "r", encoding="utf-8") as f:
+            conteudo = f.read()
+        # Remove seção existente da mesma data, se houver, pra manter idempotência
+        padrao_existente = re.compile(
+            rf"\n*## 📅 Semana de {re.escape(data_formatada)}\n.*?(?=\n## 📅 Semana de |\Z)",
+            re.DOTALL
+        )
+        conteudo = padrao_existente.sub("", conteudo)
+        conteudo = conteudo.rstrip() + "\n\n" + md_secao
+    else:
+        newline_hist = _detectar_newline("README.md") if os.path.exists("README.md") else "\n"
+        conteudo = cabecalho + "\n" + md_secao
+
+    with open("HISTORICO_PLACAR.md", "w", encoding="utf-8", newline=newline_hist) as f:
+        f.write(conteudo)
     print("HISTORICO_PLACAR.md atualizado com sucesso!")
 
 # --- EXECUÇÃO ---
 if __name__ == "__main__":
     atividades, uma_semana_atras = buscar_atividades_recentes()
     data_badges, engajamento = processar_dados(atividades, uma_semana_atras)
-    
-    atualizar_readme(data_badges)
+
     atualizar_historico(data_badges, engajamento)
+    acumulado = ler_acumulado_historico()
+    atualizar_readme(acumulado)
