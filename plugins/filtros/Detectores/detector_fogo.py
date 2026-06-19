@@ -93,6 +93,17 @@ class DetectorFogo(PluginBase):
     à imagem principal do Studio.
     """
 
+    def _ao_aplicar(self) -> None:
+        """Emite o sinal de confirmação e fecha o diálogo."""
+        if hasattr(self, "_thread_deteccao") and self._thread_deteccao is not None and self._thread_deteccao.isRunning():
+            QMessageBox.information(self, "Aguarde", "A detecção ainda está em andamento.")
+            return
+        if self._ultima_imagem_processada is None:
+            QMessageBox.information(self, "Detecção necessária", "Execute a detecção e aguarde a conclusão antes de aplicar.")
+            return
+        self.apply_requested.emit(self._ultima_imagem_processada)
+        self.accept()
+
     def closeEvent(self, event):
         """Impede fechar o diálogo se a detecção estiver em andamento, senão marca flag de cancelamento."""
         if hasattr(self, "_thread_deteccao") and self._thread_deteccao is not None and self._thread_deteccao.isRunning():
