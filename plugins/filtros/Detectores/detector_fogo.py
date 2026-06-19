@@ -15,6 +15,8 @@ import cv2
 import numpy as np
 import logging
 import os
+import socket
+import time
 from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -140,6 +142,7 @@ class DetectorFogo(PluginBase):
     _PROJECT = "fire-fhsxx"
     _VERSION = 2
     _API_KEY = "NZYJNuZfV3bJDCpXyYMH"
+    _TIMEOUT_REDE_SEGUNDOS = 20
 
     # Mapeamento de classes para rótulo em pt-BR
     _CLASSE_LABEL_PTBR = {
@@ -212,8 +215,11 @@ class DetectorFogo(PluginBase):
 
         # Armazena última imagem processada e estatísticas
         self._ultima_imagem_processada: np.ndarray | None = None
+        self._ultima_predicoes: list[dict] | None = None
         self._ultima_contagem = 0
         self._ultima_confianca_media = 0.0
+        self._thread_deteccao: QThread | None = None
+        self._worker_deteccao: _DetectorFogoWorker | None = None
 
     def _atualizar_valor_confianca(self, valor: int) -> None:
         self._valor_confianca.setText(f"{valor}%")
@@ -260,6 +266,23 @@ class DetectorFogo(PluginBase):
         if not isinstance(imagem, np.ndarray) or imagem.ndim != 3 or imagem.shape[2] != 3:
             raise ValueError("Imagem de entrada inválida para detecção de fogo.")
 
+        altura_original, largura_original = imagem.shape[:2]
+        escala_x = 1.0
+        escala_y = 1.0
+        imagem_inferencia = imagem
+
+        # A inferência remota fica mais lenta em imagens muito grandes.
+        # Redimensionamos para envio e depois reescalamos as caixas.
+        max_dimensao = 1280
+        maior_dimensao = max(altura_original, largura_original)
+        if maior_dimensao > max_dimensao:
+            fator = max_dimensao / float(maior_dimensao)
+            largura_inf = max(1, int(largura_original * fator))
+            altura_inf = max(1, int(altura_original * fator))
+            imagem_inferencia = cv2.resize(imagem, (largura_inf, altura_inf), interpolation=cv2.INTER_AREA)
+            escala_x = largura_original / float(largura_inf)
+            escala_y = altura_original / float(altura_inf)
+
         temp_path = None
         try:
             try:
@@ -279,20 +302,41 @@ class DetectorFogo(PluginBase):
             try:
                 with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
                     temp_path = tmp.name
-                    imagem_bgr = cv2.cvtColor(imagem, cv2.COLOR_RGB2BGR)
+                    imagem_bgr = cv2.cvtColor(imagem_inferencia, cv2.COLOR_RGB2BGR)
                     if not cv2.imwrite(temp_path, imagem_bgr):
                         raise RuntimeError("Falha ao gravar imagem temporária para detecção de fogo.")
             except Exception as e:
                 raise RuntimeError(f"Erro ao salvar imagem temporária: {e}") from e
 
             try:
+                inicio_inferencia = time.perf_counter()
+                timeout_anterior = socket.getdefaulttimeout()
+                socket.setdefaulttimeout(self._TIMEOUT_REDE_SEGUNDOS)
                 resultado = modelo.predict(temp_path, confidence=confianca).json()
+                duracao_inferencia = time.perf_counter() - inicio_inferencia
+                _LOGGER.warning(
+                    "Inferência Roboflow concluída em %.2fs (confiança=%s)",
+                    duracao_inferencia,
+                    confianca,
+                )
+                if duracao_inferencia > self._TIMEOUT_REDE_SEGUNDOS:
+                    _LOGGER.warning(
+                        "Inferência excedeu o tempo-alvo de %ss (levou %.2fs).",
+                        self._TIMEOUT_REDE_SEGUNDOS,
+                        duracao_inferencia,
+                    )
             except Exception as e:
                 raise RuntimeError(f"Erro ao conectar com a API do Roboflow: {e}") from e
+            finally:
+                socket.setdefaulttimeout(timeout_anterior)
 
-            import json
-
-            _LOGGER.warning(f"Resultado bruto da API Roboflow: {json.dumps(resultado, indent=2, ensure_ascii=False)}")
+            if _LOGGER.isEnabledFor(logging.DEBUG):
+                total_predicoes = len(resultado.get('predictions', [])) if isinstance(resultado, dict) else "inválido"
+                _LOGGER.debug(
+                    "Resposta da API Roboflow: tipo=%s, total_predicoes=%s",
+                    type(resultado).__name__,
+                    total_predicoes,
+                )
             if not isinstance(resultado, dict) or 'predictions' not in resultado or not isinstance(resultado['predictions'], list):
                 raise RuntimeError("Resposta inesperada da API do Roboflow.")
 
@@ -305,6 +349,20 @@ class DetectorFogo(PluginBase):
 
         imagem_resultado = imagem.copy()
         predicoes = resultado.get('predictions', [])
+
+        if escala_x != 1.0 or escala_y != 1.0:
+            predicoes_reescaladas = []
+            for pred in predicoes:
+                pred_ajustada = dict(pred)
+                try:
+                    pred_ajustada['x'] = float(pred.get('x', 0.0)) * escala_x
+                    pred_ajustada['y'] = float(pred.get('y', 0.0)) * escala_y
+                    pred_ajustada['width'] = float(pred.get('width', 0.0)) * escala_x
+                    pred_ajustada['height'] = float(pred.get('height', 0.0)) * escala_y
+                except Exception:
+                    pass
+                predicoes_reescaladas.append(pred_ajustada)
+            predicoes = predicoes_reescaladas
         contagem = len(predicoes)
         confidencias = []
 
@@ -524,63 +582,42 @@ class DetectorFogo(PluginBase):
             confianca,
             mostrar_boxes,
         )
-        def _processar_deteccao(
-            self,
-            imagem: np.ndarray,
-            confianca: int,
-            mostrar_boxes: bool,
-        ) -> tuple[np.ndarray, int, float]:
-            """Executa a detecção e retorna imagem processada e métricas."""
+        self._worker_deteccao.moveToThread(self._thread_deteccao)
+        self._thread_deteccao.started.connect(self._worker_deteccao.run)
+        self._worker_deteccao.concluido.connect(self._ao_deteccao_concluida)
+        self._worker_deteccao.falha.connect(self._ao_deteccao_falha)
+        self._worker_deteccao.concluido.connect(self._thread_deteccao.quit)
+        self._worker_deteccao.falha.connect(self._thread_deteccao.quit)
+        self._thread_deteccao.finished.connect(self._worker_deteccao.deleteLater)
+        self._thread_deteccao.finished.connect(self._thread_deteccao.deleteLater)
+        self._thread_deteccao.finished.connect(self._finalizar_deteccao_ui)
+        self._thread_deteccao.start()
 
-            if not isinstance(imagem, np.ndarray) or imagem.ndim != 3 or imagem.shape[2] != 3:
-                raise ValueError("Imagem de entrada inválida para detecção de fogo.")
+    @Slot(object, int, float)
+    def _ao_deteccao_concluida(self, imagem_resultado: np.ndarray, contagem: int, confianca_media: float) -> None:
+        """Atualiza UI ao concluir detecção em segundo plano."""
+        if getattr(self, "_fechado", False):
+            return
 
-            temp_path = None
-            try:
-                try:
-                    modelo = self._carregar_modelo(self._API_KEY)
-                except ModuleNotFoundError as e:
-                    if e.name == "roboflow":
-                        raise RuntimeError(
-                            "A biblioteca 'roboflow' não está instalada. "
-                            "Instale com: pip install -r requirements.txt"
-                        ) from e
-                    raise
-                except Exception as e:
-                    raise RuntimeError(f"Erro ao carregar modelo Roboflow: {e}") from e
+        self._ultima_imagem_processada = imagem_resultado.copy()
+        self._ultima_contagem = contagem
+        self._ultima_confianca_media = confianca_media
+        self._atualizar_estatisticas()
+        self.preview_requested.emit(imagem_resultado)
 
-                import tempfile
+    @Slot(str)
+    def _ao_deteccao_falha(self, mensagem: str) -> None:
+        """Exibe erro da detecção assíncrona ao usuário."""
+        if getattr(self, "_fechado", False):
+            return
+        _LOGGER.error(f"Falha na detecção assíncrona: {mensagem}")
+        QMessageBox.critical(self, "Erro na detecção", mensagem)
 
-                try:
-                    with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
-                        temp_path = tmp.name
-                        imagem_bgr = cv2.cvtColor(imagem, cv2.COLOR_RGB2BGR)
-                        if not cv2.imwrite(temp_path, imagem_bgr):
-                            raise RuntimeError("Falha ao gravar imagem temporária para detecção de fogo.")
-                except Exception as e:
-                    raise RuntimeError(f"Erro ao salvar imagem temporária: {e}") from e
-
-                try:
-                    resultado = modelo.predict(temp_path, confidence=confianca).json()
-                except Exception as e:
-                    raise RuntimeError(f"Erro ao conectar com a API do Roboflow: {e}") from e
-
-                import json
-
-                _LOGGER.warning(f"Resultado bruto da API Roboflow: {json.dumps(resultado, indent=2, ensure_ascii=False)}")
-                if not isinstance(resultado, dict) or 'predictions' not in resultado or not isinstance(resultado['predictions'], list):
-                    raise RuntimeError("Resposta inesperada da API do Roboflow.")
-
-            finally:
-                if temp_path and os.path.exists(temp_path):
-                    try:
-                        os.unlink(temp_path)
-                    except Exception as e:
-                        _LOGGER.error(f"Erro ao remover arquivo temporário: {e}")
-
-            predicoes = resultado.get('predictions', [])
-            self._ultima_predicoes = predicoes  # Salva as predições para alternância local
-            contagem = len(predicoes)
-            confidencias = [pred['confidence'] for pred in predicoes]
-            imagem_resultado = self._desenhar_caixas(imagem, predicoes, mostrar_boxes)
-            return imagem_resultado, contagem, sum(confidencias) / len(confidencias) if confidencias else 0.0
+    @Slot()
+    def _finalizar_deteccao_ui(self) -> None:
+        """Restaura estado da interface quando a thread termina."""
+        self.unsetCursor()
+        self._btn_detectar.setEnabled(True)
+        self._btn_aplicar.setEnabled(True)
+        self._thread_deteccao = None
+        self._worker_deteccao = None
