@@ -237,8 +237,12 @@ class FiltroPiecewise(PluginBase):
         layout_principal.addSpacing(10)
 
         # Botão Reset
-        self._btn_reset = QPushButton("Resetar Curva Atual", self)
-        layout_principal.addWidget(self._btn_reset)
+        layout_resets = QHBoxLayout()
+        self._btn_reset_atual = QPushButton("Resetar Curva Atual", self)
+        self._btn_reset_tudo = QPushButton("Resetar Tudo", self)
+        layout_resets.addWidget(self._btn_reset_atual)
+        layout_resets.addWidget(self._btn_reset_tudo)
+        layout_principal.addLayout(layout_resets)
         layout_principal.addSpacing(15)
 
         # --- Botões de Ação ---
@@ -254,7 +258,8 @@ class FiltroPiecewise(PluginBase):
             radio.toggled.connect(self._ao_alterar_canal)
 
         self.widget_curva.curva_alterada.connect(self._ao_alterar_parametros)
-        self._btn_reset.clicked.connect(self._resetar_canal_atual)
+        self._btn_reset_atual.clicked.connect(self._resetar_canal_atual)
+        self._btn_reset_tudo.clicked.connect(self._resetar_tudo)
 
         self._btn_aplicar.clicked.connect(self._ao_aplicar)
         self._btn_cancelar.clicked.connect(self.reject)
@@ -336,6 +341,22 @@ class FiltroPiecewise(PluginBase):
         self.widget_curva.ponto_selecionado = -1
         self.widget_curva.update()
         
+        self._ao_alterar_parametros()
+
+    def _resetar_tudo(self) -> None:
+        """Limpa as curvas de TODOS os canais e restaura a imagem original."""
+        pontos_padrao = [QPointF(0.0, 0.0), QPointF(1.0, 1.0)]
+        
+        # Percorre o dicionário e reseta a memória de todos os canais simultaneamente
+        for canal in self.memorias_curvas.keys():
+            self.memorias_curvas[canal] = pontos_padrao.copy()
+        
+        # Reseta o widget visualmente para a aba atual
+        self.widget_curva.pontos = pontos_padrao.copy()
+        self.widget_curva.ponto_selecionado = -1
+        self.widget_curva.update()
+        
+        # Reaplica o processamento (que agora usará apenas retas [0,1] neutras)
         self._ao_alterar_parametros()
 
     def _ao_alterar_parametros(self) -> None:
