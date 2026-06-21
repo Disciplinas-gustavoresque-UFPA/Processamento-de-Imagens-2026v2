@@ -63,17 +63,6 @@ class WidgetCurvaInterativa(QWidget):
         self.cor_curva = QColor(cores.get(canal, "#00d7ff"))
         self.update()
 
-    def obter_pontos_lut(self) -> tuple[list[float], list[float]]:
-        """Retorna os valores X e Y no range [0, 255] para a criação da LUT."""
-        x = [p.x() * 255.0 for p in self.pontos]
-        y = [p.y() * 255.0 for p in self.pontos]
-        return x, y
-
-    def resetar(self):
-        self.pontos = [QPointF(0.0, 0.0), QPointF(1.0, 1.0)]
-        self.curva_alterada.emit()
-        self.update()
-
     # --- Conversão de Coordenadas ---
     def _valor_para_tela(self, p: QPointF) -> QPointF:
         x_tela = self.margem + (p.x() * self.area_plot)
@@ -199,6 +188,15 @@ class FiltroPiecewise(PluginBase):
     def setup_ui(self) -> None:
         layout_principal = QVBoxLayout(self)
 
+        # --- Estrutura de Memória dos Canais ---
+        self.memorias_curvas = {
+            "rgb": [QPointF(0.0, 0.0), QPointF(1.0, 1.0)],
+            "r":   [QPointF(0.0, 0.0), QPointF(1.0, 1.0)],
+            "g":   [QPointF(0.0, 0.0), QPointF(1.0, 1.0)],
+            "b":   [QPointF(0.0, 0.0), QPointF(1.0, 1.0)]
+        }
+        self.canal_anterior = "rgb"
+
         # --- Seleção do Canal ---
         rotulo_canal = QLabel("Canal a ser editado:", self)
         layout_principal.addWidget(rotulo_canal)
@@ -256,7 +254,7 @@ class FiltroPiecewise(PluginBase):
             radio.toggled.connect(self._ao_alterar_canal)
 
         self.widget_curva.curva_alterada.connect(self._ao_alterar_parametros)
-        self._btn_reset.clicked.connect(self.widget_curva.resetar)
+        self._btn_reset.clicked.connect(self._resetar_canal_atual)
 
         self._btn_aplicar.clicked.connect(self._ao_aplicar)
         self._btn_cancelar.clicked.connect(self.reject)
@@ -274,35 +272,70 @@ class FiltroPiecewise(PluginBase):
     # Lógica de processamento
     # ------------------------------------------------------------------
 
-    def processar(self, imagem: np.ndarray) -> np.ndarray:
-        """Aplica a curva (LUT) ao canal selecionado."""
-        xp, yp = self.widget_curva.obter_pontos_lut()
+    def _gerar_lut(self, pontos: list[QPointF]) -> np.ndarray:
+        """Função utilitária para converter uma lista de QPointF em uma LUT de 256 posições."""
+        x = [p.x() * 255.0 for p in pontos]
+        y = [p.y() * 255.0 for p in pontos]
         x_valores = np.arange(256)
+        lut = np.interp(x_valores, x, y)
+        return np.clip(lut, 0, 255).astype(np.uint8)
+
+    def processar(self, imagem: np.ndarray) -> np.ndarray:
+        """Aplica cumulativamente as curvas de todos os canais na imagem final."""
         
-        # Cria a Look-Up Table resolvendo a equação para os 256 tons possíveis
-        lut = np.interp(x_valores, xp, yp)
-        lut = np.clip(lut, 0, 255).astype(np.uint8)
-        
-        canal_alvo = self._obter_canal()
+        # Sincroniza a memória com o que está desenhado na tela atualmente
+        canal_atual = self._obter_canal()
+        self.memorias_curvas[canal_atual] = self.widget_curva.pontos.copy()
+
         imagem_saida = imagem.copy()
 
-        if canal_alvo == "rgb":
-            # Aplica a mesma tabela nos três canais simultaneamente
-            imagem_saida = cv2.LUT(imagem_saida, lut)
-        else:
-            # Pega apenas o índice do canal (0=R, 1=G, 2=B) e aplica a LUT só nele
-            idx_canal = {"r": 0, "g": 1, "b": 2}[canal_alvo]
-            imagem_saida[..., idx_canal] = cv2.LUT(imagem_saida[..., idx_canal], lut)
+        # Aplica primeiro a curva global (RGB) em todos os canais
+        lut_rgb = self._gerar_lut(self.memorias_curvas["rgb"])
+        imagem_saida = cv2.LUT(imagem_saida, lut_rgb)
+
+        # Aplica as curvas específicas
+        canais_individuais = [("r", 0), ("g", 1), ("b", 2)]
+        
+        for canal_nome, idx in canais_individuais:
+            pontos_canal = self.memorias_curvas[canal_nome]
+            lut_canal = self._gerar_lut(pontos_canal)
+            imagem_saida[..., idx] = cv2.LUT(imagem_saida[..., idx], lut_canal)
 
         return imagem_saida
 
     def _ao_alterar_canal(self, checado: bool) -> None:
-        """Atualiza a cor do gráfico e refaz o processamento ao trocar de aba de cor."""
+        """Salva a curva atual e carrega a nova curva ao trocar de aba de cor."""
         if not checado:
-            return
-        
+            return 
+
         canal_atual = self._obter_canal()
+
+        # Salva o estado físico da curva no canal que estava sendo editando antes da troca
+        self.memorias_curvas[self.canal_anterior] = self.widget_curva.pontos.copy()
+
+        # Injeta no gráfico interativo os pontos da memória do novo canal selecionado
+        self.widget_curva.pontos = self.memorias_curvas[canal_atual].copy()
+        
+        # Atualiza a interface visualmente
         self.widget_curva.definir_cor_canal(canal_atual)
+        self.widget_curva.ponto_selecionado = -1
+        self.canal_anterior = canal_atual
+        self.widget_curva.update()
+
+        # Chama o processamento para garantir a atualização da imagem
+        self._ao_alterar_parametros()
+        
+    def _resetar_canal_atual(self) -> None:
+        """Limpa apenas a curva do canal que está visível no momento."""
+        canal_atual = self._obter_canal()
+        pontos_padrao = [QPointF(0.0, 0.0), QPointF(1.0, 1.0)]
+        
+        # Reseta a memória e o widget
+        self.memorias_curvas[canal_atual] = pontos_padrao.copy()
+        self.widget_curva.pontos = pontos_padrao.copy()
+        self.widget_curva.ponto_selecionado = -1
+        self.widget_curva.update()
+        
         self._ao_alterar_parametros()
 
     def _ao_alterar_parametros(self) -> None:
