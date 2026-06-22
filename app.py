@@ -202,6 +202,7 @@ def _formatar_nome_menu(nome_pasta: str) -> str:
     return nome_pasta.capitalize()
 
 
+
 def carregar_plugins_dinamicamente(
     menu_pai: QMenu,
     diretorio: str,
@@ -255,6 +256,7 @@ def carregar_plugins_dinamicamente(
                     lambda _checked=False, cls=classe_plugin: janela_principal.abrir_plugin(cls)
                 )
 
+    
 # ---------------------------------------------------------------------------
 # Classes de Estado
 # ---------------------------------------------------------------------------
@@ -266,6 +268,8 @@ class DocumentoImagem(QWidget):
     """
     # Cria um sinal para repassar a alteração de zoom para a janela principal
     zoom_alterado = Signal(float)
+
+    
 
     def __init__(self, caminho_arquivo: str, imagem_bgr: np.ndarray, parent=None):
         super().__init__(parent)
@@ -1100,6 +1104,11 @@ class JanelaPrincipal(QMainWindow):
         dialogo.preview_requested.connect(lambda rgb: self._ao_receber_preview(rgb, aba_atual))
         dialogo.apply_requested.connect(lambda rgb: self._ao_aplicar_plugin(rgb, aba_atual))
 
+        if hasattr(dialogo, "multiple_images_requested"):
+            dialogo.multiple_images_requested.connect(
+                lambda imagens: self._ao_aplicar_multiplas_imagens(imagens, aba_atual)
+            )
+
         # Se o usuário fechar sem aplicar, restaura a imagem original
         dialogo.finished.connect(lambda codigo: self._ao_fechar_plugin(codigo, aba_atual))
 
@@ -1180,6 +1189,32 @@ class JanelaPrincipal(QMainWindow):
         self._marcar_como_modificado(aba, True)
 
         self.statusBar().showMessage("Filtro aplicado com sucesso.")
+
+    def _ao_aplicar_multiplas_imagens(self, imagens_rgb, aba_atual):
+        """Cria novas abas a partir de múltiplas imagens RGB geradas por um plugin."""
+        if not isinstance(aba_atual, DocumentoImagem):
+            return
+
+        nome_base = os.path.splitext(os.path.basename(aba_atual.caminho))[0]
+        if not nome_base:
+            nome_base = "Imagem"
+
+        for nome_canal, imagem_rgb in imagens_rgb:
+            imagem_bgr = cv2.cvtColor(imagem_rgb, cv2.COLOR_RGB2BGR)
+
+            nome_aba = f"{nome_base} - {nome_canal}"
+            caminho_ficticio = f"/{nome_aba}.png"
+
+            self._adicionar_documento_imagem(
+                caminho_ficticio,
+                imagem_bgr,
+                nome_aba=nome_aba,
+                tooltip=f"{nome_aba} (Não salvo)",
+                modificado=True,
+            )
+
+        aba_atual.imagem_backup = None
+        self.statusBar().showMessage("Canais RGB gerados em abas separadas.")
 
     def desfazer(self) -> None:
         """Desfaz a última operação aplicada."""
