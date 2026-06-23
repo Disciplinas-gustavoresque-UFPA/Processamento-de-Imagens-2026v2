@@ -17,7 +17,7 @@ Onde:
 * Valor/Brilho (V) do espaço HSV.
 
 Observações:
-* Quando um canal HSV é selecionado, a imagem de entrada é convertida de RBG para HSV utilizando cv.cvtColor().
+* Quando um canal HSV é selecionado, a imagem de entrada é convertida de RBG para HSV utilizando cv2.cvtColor().
 * No OpenCV, o canal H possui faixa de valores entre 0 e 179, enquanto S e V possuem faixa entre 0 e 255. Portanto, o slider de limiar deve ser ajustado de acordo com o canal selecionado.
 """
 
@@ -37,7 +37,9 @@ from PySide6.QtWidgets import (
 from core.plugin_base import PluginBase
 
 class FiltroBinarizacao(PluginBase):
-    """Plugin para binarização da imagem"""
+    """
+    Plugin para binarização da imagem
+    """
     display_name = "Binarização"
 
     # ------------------------------------------------------------------
@@ -115,11 +117,14 @@ class FiltroBinarizacao(PluginBase):
         self._ao_alterar_parametros(True)
 
     def _obter_metodo(self) -> str:
-        """Verifica qual rádio button está marcado e retorna a sua chave."""
+        """
+        Verifica qual rádio button está marcado e retorna a sua chave.
+        """
         for valor, radio in self._radios_metodo.items():
             if radio.isChecked():
                 return valor
         return "media"
+    
 
     def processar(self, imagem: np.ndarray) -> np.ndarray:
         """
@@ -135,7 +140,7 @@ class FiltroBinarizacao(PluginBase):
 
         # 2º Verifica se o método selecionado é um canal HSV. Se for, converte a imagem para HSV.
 
-        if metodo in ["h", "s", "v"]:
+        if metodo in {"h", "s", "v"}:
             imagem_hsv = cv2.cvtColor(imagem, cv2.COLOR_RGB2HSV)
             if metodo == "h":
                 canal_base = imagem_hsv[..., 0]  # Matiz (0-179)
@@ -161,14 +166,20 @@ class FiltroBinarizacao(PluginBase):
         # O motor de renderização principal (app.py) espera uma imagem com 3 dimensões (RGB).
         # Empilha o resultado binário (1 canal) nos três canais finais
         return np.stack((img_bin, img_bin, img_bin), axis=-1)
+    
 
     def _ao_mover_slider(self, valor: int) -> None:
-        """Atualiza o texto da interface quando o slider é movimentado."""
+        """
+        Atualiza o texto da interface quando o slider é movimentado.
+        """
         self._rotulo_limiar.setText(f"Limiar (Threshold): {valor}")
         self._ao_alterar_parametros(True)
 
+
     def _ao_alterar_parametros(self, marcado: bool) -> None:
-        """Regera o processamento para mostrar o preview ao vivo no canvas."""
+        """
+        Regera o processamento para mostrar o preview ao vivo no canvas.
+        """
         if not marcado:
             return
         
@@ -195,7 +206,9 @@ class FiltroBinarizacao(PluginBase):
         self.preview_requested.emit(imagem_processada)
 
     def _ao_aplicar(self) -> None:
-        """Aplica o filtro na matriz oficial e adiciona ao histórico."""
+        """
+        Aplica o filtro na matriz oficial e adiciona ao histórico.
+        """
         imagem_processada = self.processar(self.imagem_original)
         self.apply_requested.emit(imagem_processada)
         self.accept()
