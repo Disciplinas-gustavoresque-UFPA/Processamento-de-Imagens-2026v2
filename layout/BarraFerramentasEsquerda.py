@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 
 from PySide6.QtCore import QByteArray, QPoint, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap, QPolygon
@@ -19,9 +19,9 @@ class BotaoZoom(QToolButton):
     def __init__(
         self,
         pasta_icones: Path,
-        carregar_icone_branco: Callable[[Path], QIcon | None],
-        carregar_icone_preto: Callable[[Path], QIcon | None],
-        parent: QWidget | None = None,
+        carregar_icone_branco: Callable[[Path], Optional[QIcon]],
+        carregar_icone_preto: Callable[[Path], Optional[QIcon]],
+        parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
         self._pasta_icones = pasta_icones
@@ -149,6 +149,7 @@ class BarraFerramentasEsquerda(QFrame):
         self._nomes_ferramenta: list[str] = []
         definicoes = [
             ("Mover", pasta_icones / "hand.svg", "H"),
+            ("Seleção", None, "S"),
             ("Zoom", pasta_icones / "zoom.svg", "Z"),
             ("Rotação", None, "R"),
         ]
@@ -185,7 +186,7 @@ class BarraFerramentasEsquerda(QFrame):
             self._botao_toggle.setText("<")
             self._botao_toggle.setToolTip("Encolher barra lateral")
 
-    def _criar_botao(self, nome: str, caminho_icone: Path | None, fallback: str) -> QToolButton:
+    def _criar_botao(self, nome: str, caminho_icone: Optional[Path], fallback: str) -> QToolButton:
         botao = QToolButton(self)
         botao.setObjectName("toolButton")
         botao.setProperty("class", "toolButton")
@@ -205,6 +206,11 @@ class BarraFerramentasEsquerda(QFrame):
                 botao.setIcon(icone)
                 botao.setIconSize(QSize(20, 20))
                 return botao
+
+        if nome == "Seleção":
+            botao.setText("S")
+            botao.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+            return botao
 
         # Fallback visual quando a biblioteca de icones nao estiver disponivel.
         botao.setText(fallback)
@@ -227,7 +233,7 @@ class BarraFerramentasEsquerda(QFrame):
     def _ao_modo_zoom_alterado(self, modo: str) -> None:
         self.modo_zoom_alterado.emit(modo)
 
-    def _carregar_icone_branco(self, caminho_icone: Path) -> QIcon | None:
+    def _carregar_icone_branco(self, caminho_icone: Path) -> Optional[QIcon]:
         """Carrega um SVG local e força cor branca para combinar com o tema escuro."""
         try:
             conteudo_svg = caminho_icone.read_text(encoding="utf-8")
@@ -248,7 +254,7 @@ class BarraFerramentasEsquerda(QFrame):
 
         return QIcon(pixmap)
 
-    def _carregar_icone_preto(self, caminho_icone: Path) -> QIcon | None:
+    def _carregar_icone_preto(self, caminho_icone: Path) -> Optional[QIcon]:
         """Carrega um SVG local e força cor preta para menus claros."""
         try:
             conteudo_svg = caminho_icone.read_text(encoding="utf-8")
@@ -269,7 +275,7 @@ class BarraFerramentasEsquerda(QFrame):
 
         return QIcon(pixmap)
 
-    def _icone_rotacao_espelhamento(self) -> QIcon | None:
+    def _icone_rotacao_espelhamento(self) -> Optional[QIcon]:
         """Cria um ícone SVG para rotação/espelhamento."""
         svg = '<svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M4 10a6 6 0 1 0 12 0" fill="none" stroke="#FFFFFF" stroke-width="1.5"/><path d="M14 6 L16 10 L12 10" fill="#FFFFFF"/></svg>'
         renderer = QSvgRenderer(QByteArray(svg.encode("utf-8")))
