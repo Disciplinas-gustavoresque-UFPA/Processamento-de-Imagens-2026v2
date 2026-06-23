@@ -122,12 +122,30 @@ class FiltroBinarizacao(PluginBase):
         return "media"
 
     def processar(self, imagem: np.ndarray) -> np.ndarray:
-        """Lógica matemática executada a cada alteração nos controles."""
+        """
+        Lógica matemática executada a cada alteração nos controles.
+        
+        Converter a imagem RGB para HSV usando cv2.cvtColor().
+        """
         metodo = self._obter_metodo()
         limiar = self._slider_limiar.value()
 
         # O app.py envia a imagem no formato RGB.
         # Extraí o canal escolhido via slicing:
+
+        # 2º Verifica se o método selecionado é um canal HSV. Se for, converte a imagem para HSV.
+
+        if metodo in ["h", "s", "v"]:
+            #Converte a imagem de RGB para HSV
+            imagem_hsv = cv2.cvtColor(imagem, cv2.COLOR_RGB2HSV)
+            if metodo == "h":
+                canal_base = imagem_hsv[..., 0]  # Canal H (Matiz)
+            elif metodo == "s":
+                canal_base = imagem_hsv[..., 1]  # Canal S (Saturação)
+            elif metodo == "v":
+                canal_base = imagem_hsv[..., 2]  # Canal V (Valor/Brilho)
+        
+        # lógica RBG original
         if metodo == "r":
             canal_base = imagem[..., 0]
         elif metodo == "g":
