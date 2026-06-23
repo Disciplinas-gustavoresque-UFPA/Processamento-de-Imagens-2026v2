@@ -60,7 +60,11 @@ class FiltroBinarizacao(PluginBase):
             ("Canal Vermelho (R)", "r"),
             ("Canal Verde (G)", "g"),
             ("Canal Azul (B)", "b"),
-            ()
+
+            # 1º Atualização a interface. Novas Opções do Canal HSV.
+            ("Matiz (H)", "h"),
+            ("Saturação (S)", "s"),
+            ("Valor/Brilho (V)", "v"),
             ]
         
         for texto, valor in opcoes:
