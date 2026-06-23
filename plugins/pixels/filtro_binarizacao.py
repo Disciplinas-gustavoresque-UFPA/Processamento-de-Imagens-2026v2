@@ -45,7 +45,9 @@ class FiltroBinarizacao(PluginBase):
     # ------------------------------------------------------------------
 
     def setup_ui(self) -> None:
-        """Cria o slider de seleção do limiar (threshold), opções de canalRGB e os botões Aplicar/Cancelar."""
+        """
+        Cria o slider de seleção do limiar (threshold) e opções de canalRGB, opções do canal HSV e os botões Aplicar/Cancelar.
+        """
         layout_principal = QVBoxLayout(self)
         
         # --- Seleção da Origem da Imagem ---
