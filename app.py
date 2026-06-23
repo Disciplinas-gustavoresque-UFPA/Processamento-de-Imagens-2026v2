@@ -776,10 +776,10 @@ class JanelaPrincipal(QMainWindow):
         self,
         caminho: str,
         imagem_bgr: np.ndarray,
-        nome_aba: str | None = None,
-        tooltip: str | None = None,
+        nome_aba: str, #| None = None,
+        tooltip: str, #| None = None,
+        mensagem_status: str, # | None = None,
         modificado: bool = False,
-        mensagem_status: str | None = None,
     ) -> DocumentoImagem:
         """Cria uma aba editável para uma imagem já carregada em memória."""
         self._imagem_atual = imagem_bgr
@@ -978,7 +978,7 @@ class JanelaPrincipal(QMainWindow):
 
     def _normalizar_caminho_salvamento(
         self, caminho: str, filtro_selecionado: str
-    ) -> str | None:
+    ) -> str:
         _raiz, extensao = os.path.splitext(caminho)
         if not extensao:
             return caminho + self._extensao_por_filtro_salvamento(filtro_selecionado)
@@ -1096,7 +1096,11 @@ class JanelaPrincipal(QMainWindow):
         imagem_rgb = cv2.cvtColor(aba_atual.imagem_atual, cv2.COLOR_BGR2RGB)
         aba_atual.imagem_backup = aba_atual.imagem_atual.copy()
 
-        dialogo = classe_plugin(imagem_rgb, self)
+        selecao = None
+        if hasattr(aba_atual.visualizador, "obter_selecao_retangular"):
+            selecao = aba_atual.visualizador.obter_selecao_retangular()
+
+        dialogo = classe_plugin(imagem_rgb, self, selecao_retangular=selecao)
         dialogo.preview_requested.connect(lambda rgb: self._ao_receber_preview(rgb, aba_atual))
         dialogo.apply_requested.connect(lambda rgb: self._ao_aplicar_plugin(rgb, aba_atual))
 
@@ -1148,7 +1152,7 @@ class JanelaPrincipal(QMainWindow):
 
     def _ao_receber_preview(self, imagem_rgb: np.ndarray, aba: DocumentoImagem) -> None:
         """Exibe a pré-visualização sem alterar a imagem de trabalho."""
-        imagem_bgr = cv2.cvtColor(imagem_rgb, cv2.COLOR_RGB2BGR)
+        imagem_bgr = self._mesclar_regiao_processada(aba, imagem_rgb)
         aba.atualizar_visualizacao(imagem_bgr)
 
 
@@ -1161,8 +1165,7 @@ class JanelaPrincipal(QMainWindow):
         if aba.imagem_atual is not None:
             aba.historico.salvar(aba.imagem_atual.copy())
 
-        imagem_bgr = cv2.cvtColor(imagem_rgb, cv2.COLOR_RGB2BGR)
-
+        imagem_bgr = self._mesclar_regiao_processada(aba, imagem_rgb)
         aba.imagem_atual = imagem_bgr
         aba.imagem_backup = None
 
@@ -1220,6 +1223,28 @@ class JanelaPrincipal(QMainWindow):
         nivel_zoom = round(zoom * 100)
         self._label_zoom_status.setText(f"Zoom: {nivel_zoom:.0f}%")
 
+    def _mesclar_regiao_processada(
+        self,
+        aba: DocumentoImagem,
+        imagem_processada_rgb: np.ndarray,
+    ) -> np.ndarray:
+        """Retorna a imagem completa onde apenas a região selecionada é atualizada."""
+        selecao = None
+        if hasattr(aba.visualizador, "obter_selecao_retangular"):
+            selecao = aba.visualizador.obter_selecao_retangular()
+
+        imagem_bgr = cv2.cvtColor(imagem_processada_rgb, cv2.COLOR_RGB2BGR)
+        if selecao is None or aba.imagem_atual is None:
+            return imagem_bgr
+
+        resultado = aba.imagem_atual.copy()
+        x, y, w, h = selecao.x(), selecao.y(), selecao.width(), selecao.height()
+        if w <= 0 or h <= 0:
+            return imagem_bgr
+
+        resultado[y : y + h, x : x + w] = imagem_bgr[y : y + h, x : x + w]
+        return resultado
+
     def _ao_ferramenta_alterada(self, ferramenta: str) -> None:
         """Aplica o comportamento da ferramenta selecionada na toolbar."""
         self._ferramenta_ativa_toolbar = ferramenta
@@ -1230,6 +1255,7 @@ class JanelaPrincipal(QMainWindow):
         if ferramenta == "mover":
             if visualizador is None:
                 return
+            visualizador.definir_modo_selecao(False)
             visualizador.definir_ferramenta_mao(True)
             visualizador.definir_ferramenta_zoom(None)
             return
@@ -1237,24 +1263,31 @@ class JanelaPrincipal(QMainWindow):
         if ferramenta == "zoom":
             if visualizador is None:
                 return
+            visualizador.definir_modo_selecao(False)
             visualizador.definir_ferramenta_mao(False)
             visualizador.definir_ferramenta_zoom(self._modo_zoom_toolbar)
             return
 
+        if ferramenta == "seleção":
+            if visualizador is None:
+                return
+            visualizador.definir_ferramenta_mao(False)
+            visualizador.definir_ferramenta_zoom(None)
+            visualizador.definir_modo_selecao(True)
+            return
+
         if ferramenta == "rotação":
-            # Abre o diálogo de rotação e espelhamento
             if not isinstance(aba_atual, DocumentoImagem):
                 return
+            visualizador.definir_modo_selecao(False)
             self._abrir_plugin_rotacao_espelhamento()
-            # Volta para a ferramenta de mover após fechar o diálogo.
-            # A sincronização ocorre por um único caminho (selecionar_ferramenta_por_nome)
-            # para evitar que o slot de alteração da ferramenta execute em duplicidade.
             self._ferramenta_ativa_toolbar = "mover"
             self._toolbar_esquerda.selecionar_ferramenta_por_nome("mover")
             return
 
         if visualizador is None:
             return
+        visualizador.definir_modo_selecao(False)
         visualizador.definir_ferramenta_mao(False)
         visualizador.definir_ferramenta_zoom(None)
 
