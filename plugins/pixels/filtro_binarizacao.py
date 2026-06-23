@@ -171,6 +171,25 @@ class FiltroBinarizacao(PluginBase):
         """Regera o processamento para mostrar o preview ao vivo no canvas."""
         if not marcado:
             return
+        
+        # Bloqueia os sinais para evitar que o evento valueChanged dipare loops indesejados
+        self._slider_limiar.blockSignals(True)
+
+
+        metodo = self._obter_metodo()
+        if metodo == "h":
+            self._slider_limiar.setRange(0, 179)  # Canal H: 0-179
+            if self._slider_limiar.value() > 179:
+                self._slider_limiar.setValue(179)  # Ajusta o valor do slider se estiver fora do range
+        else:
+            self._slider_limiar.setRange(0, 255)  # Aos demais canais: 0-255
+
+        self._slider_limiar.blockSignals(False) 
+
+        # Garante que o teXto eXiba o valor real do slider apos o ajuste do range
+        valor_atual = self._slider_limiar.value()
+        self._rotulo_limiar.setText(f"Limiar (Threshold): {valor_atual}")       
+
         # Utiliza a cópia da imagem enviada pelo construtor da PluginBase
         imagem_processada = self.processar(self.imagem_original)
         self.preview_requested.emit(imagem_processada)
