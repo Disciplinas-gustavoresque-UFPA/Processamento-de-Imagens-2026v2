@@ -136,17 +136,14 @@ class FiltroBinarizacao(PluginBase):
         # 2º Verifica se o método selecionado é um canal HSV. Se for, converte a imagem para HSV.
 
         if metodo in ["h", "s", "v"]:
-            #Converte a imagem de RGB para HSV
             imagem_hsv = cv2.cvtColor(imagem, cv2.COLOR_RGB2HSV)
             if metodo == "h":
-                canal_base = imagem_hsv[..., 0]  # Canal H (Matiz)
+                canal_base = imagem_hsv[..., 0]  # Matiz (0-179)
             elif metodo == "s":
-                canal_base = imagem_hsv[..., 1]  # Canal S (Saturação)
-            elif metodo == "v":
-                canal_base = imagem_hsv[..., 2]  # Canal V (Valor/Brilho)
-        
-        # lógica RBG original
-        if metodo == "r":
+                canal_base = imagem_hsv[..., 1]  # Saturação (0-255)
+            else:
+                canal_base = imagem_hsv[..., 2]  # Valor/Brilho (0-255)
+        elif metodo == "r":
             canal_base = imagem[..., 0]
         elif metodo == "g":
             canal_base = imagem[..., 1]
