@@ -30,7 +30,7 @@ from core.plugin_base import PluginBase
 
 
 class FiltroRuidoGaussiano(PluginBase):
-    """Plugin para aplicação de Ruído Gaussiano seletivo com Seed."""
+    """Plugin para aplicação de Ruído Gaussiano (Aditivo ou Substitutivo) com Seed."""
     
     display_name = "Ruído Gaussiano"
 
@@ -39,8 +39,29 @@ class FiltroRuidoGaussiano(PluginBase):
     # ------------------------------------------------------------------
 
     def setup_ui(self) -> None:
-        """Constrói as opções de canais, sliders numéricos e controle de semente."""
+        """Constrói as opções de canais, modo de operação, sliders numéricos e controle de semente."""
         layout_principal = QVBoxLayout(self)
+
+        # --- Modo de Operação (Adição vs Substituição) ---
+        rotulo_modo = QLabel("Modo de Operação do Ruído:", self)
+        layout_principal.addWidget(rotulo_modo)
+
+        self._grupo_modos = QButtonGroup(self)
+        self._radios_modo: dict[str, QRadioButton] = {}
+
+        opcoes_modo = [
+            ("Adição (Tradicional)", "aditivo"),
+            ("Substituição (Estilo Hurl)", "substitutivo"),
+        ]
+
+        for texto, valor in opcoes_modo:
+            radio = QRadioButton(texto, self)
+            self._grupo_modos.addButton(radio)
+            self._radios_modo[valor] = radio
+            layout_principal.addWidget(radio)
+
+        self._radios_modo["aditivo"].setChecked(True)  # Aditivo como padrão comercial
+        layout_principal.addSpacing(10)
 
         # --- Seleção do Canal Afetado ---
         rotulo_canal = QLabel("Canal afetado pelo ruído:", self)
@@ -111,6 +132,9 @@ class FiltroRuidoGaussiano(PluginBase):
         layout_principal.addLayout(layout_botoes)
 
         # --- Conexões de Sinais (Eventos) ---
+        for radio in self._radios_modo.values():
+            radio.toggled.connect(self._ao_alterar_parametros)
+    
         for radio in self._radios_canal.values():
             radio.toggled.connect(self._ao_alterar_parametros)
 
@@ -138,16 +162,24 @@ class FiltroRuidoGaussiano(PluginBase):
                 return valor
         return "rgb"
 
+    def _obter_modo(self) -> str:
+        """Verifica se o modo selecionado é aditivo ou substitutivo."""
+        for valor, radio in self._radios_modo.items():
+            if radio.isChecked():
+                return valor
+        return "aditivo"
+
     # ------------------------------------------------------------------
     # Lógica de processamento
     # ------------------------------------------------------------------
 
     def processar(self, imagem: np.ndarray) -> np.ndarray:
-        """Aplica a substituição gaussiana respeitando a semente geradora."""
+        """Aplica o ruído gaussiano (aditivo ou substitutivo) conforme parâmetros."""
         
         porcentagem = self._slider_porcentagem.value() / 100.0
         desvio = self._slider_desvio.value()
         canal_alvo = self._obter_canal()
+        modo = self._obter_modo()
         
         if porcentagem == 0.0:
             return imagem.copy()
@@ -161,31 +193,50 @@ class FiltroRuidoGaussiano(PluginBase):
             rng = np.random.default_rng()
 
         altura, largura, canais = imagem.shape
-        imagem_saida = imagem.copy()
 
-        # Criação da máscara com ruído
+        # Para o modo aditivo, precisa do cálculo em float para evitar overflow/underflow
+        imagem_trabalho = imagem.astype(np.float32) if modo == "aditivo" else imagem.copy()
+
+        # Criação da máscara de pixels afetados
         mascara_2d = rng.random((altura, largura)) < porcentagem
 
         # Seleção de canal e substituição de pixels pelo ruído
         if canal_alvo == "rgb":
-            # rng.normal substitui o antigo np.random.normal
-            ruido = rng.normal(loc=128.0, scale=desvio, size=imagem.shape)
-            ruido = np.clip(ruido, 0, 255).astype(np.uint8)
-            
-            mascara_3d = np.expand_dims(mascara_2d, axis=-1)
-            imagem_saida = np.where(mascara_3d, ruido, imagem_saida)
+            if modo == "substitutivo":
+                # Lógica Original: Substitui o valor do pixel focado em torno do cinza médio (128)
+                ruido = rng.normal(loc=128.0, scale=desvio, size=imagem.shape)
+                ruido = np.clip(ruido, 0, 255).astype(np.uint8)
+                mascara_3d = np.expand_dims(mascara_2d, axis=-1)
+                imagem_saida = np.where(mascara_3d, ruido, imagem_trabalho)
+            else:
+                # Lógica Aditiva: Soma/subtrai o ruído centrado em 0 da imagem original
+                ruido = rng.normal(loc=0.0, scale=desvio, size=imagem.shape)
+                mascara_3d = np.expand_dims(mascara_2d, axis=-1)
+                ruido_filtrado = np.where(mascara_3d, ruido, 0.0)
+                imagem_saida = np.clip(imagem_trabalho + ruido_filtrado, 0, 255).astype(np.uint8)
             
         else:
             idx_canal = {"r": 0, "g": 1, "b": 2}[canal_alvo]
             
-            ruido_canal = rng.normal(loc=128.0, scale=desvio, size=(altura, largura))
-            ruido_canal = np.clip(ruido_canal, 0, 255).astype(np.uint8)
-            
-            imagem_saida[..., idx_canal] = np.where(
-                mascara_2d, 
-                ruido_canal, 
-                imagem_saida[..., idx_canal]
-            )
+            if modo == "substitutivo":
+                ruido_canal = rng.normal(loc=128.0, scale=desvio, size=(altura, largura))
+                ruido_canal = np.clip(ruido_canal, 0, 255).astype(np.uint8)
+                
+                imagem_saida = imagem_trabalho
+                imagem_saida[..., idx_canal] = np.where(
+                    mascara_2d, 
+                    ruido_canal, 
+                    imagem_trabalho[..., idx_canal]
+                )
+            else:
+                ruido_canal = rng.normal(loc=0.0, scale=desvio, size=(altura, largura))
+                ruido_filtrado = np.where(mascara_2d, ruido_canal, 0.0)
+                
+                imagem_saida = imagem_trabalho.copy()
+                imagem_saida[..., idx_canal] = np.clip(
+                    imagem_trabalho[..., idx_canal] + ruido_filtrado, 0, 255
+                )
+                imagem_saida = imagem_saida.astype(np.uint8)
 
         return imagem_saida
 
