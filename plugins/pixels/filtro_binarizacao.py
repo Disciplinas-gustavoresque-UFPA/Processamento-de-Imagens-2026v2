@@ -6,15 +6,15 @@ Plugin de exemplo: binarização interativa de imagens via slider.
 A implementação segue três etapas:
 
 1) Seleção do canal base da imagem RGB de entrada .
-2) Conversão do canal escolhido para tons de cinza (Canal R, Canal G, Canal B, Média RGB ou HSV).
+2) Conversão do canal escolhido para tons de cinza (Canal R, Canal G, Canal B, Média RGB ou Canal HSV).
 3) Aplicação do threshold para separar os pixels em dois grupos: pretos (0) e brancos (255) baseado no valor de limiar.
 
 Onde:
 * O método de extração pode ser R, G, B ou Média RGB.
 * Limiar (threshold) está no intervalo [0, 255].
-* Matriz (H) do espaço HSV.
+* Matiz (H) do espaço HSV.
 * Saturação (S) do espaço HSV.
-* Value/Brilho (V) do espaço HSV.
+* Valor/Brilho (V) do espaço HSV.
 
 Observações:
 * Quando um canal HSV é selecionado, a imagem de entrada é convertida de RBG para HSV utilizando cv.cvtColor().
@@ -60,6 +60,7 @@ class FiltroBinarizacao(PluginBase):
             ("Canal Vermelho (R)", "r"),
             ("Canal Verde (G)", "g"),
             ("Canal Azul (B)", "b"),
+            ()
             ]
         
         for texto, valor in opcoes:
