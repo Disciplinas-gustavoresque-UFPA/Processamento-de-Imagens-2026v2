@@ -1,10 +1,13 @@
 """
 plugins/pixels/filtro_ruido_gaussiano.py
 -----------------------------------------
-Plugin inspirado no filtro Hurl do GIMP.
+Implementa o Ruído Gaussiano, considerando os modos de adição e substituição.
+Modo de substituição inspirado no filtro Hurl do GIMP.
 
-Substitui uma porcentagem específica de pixels da imagem por valores
-aleatórios baseados em uma distribuição Gaussiana. Permite selecionar
+Substitui ou adiciona valores aleatórios baseados em uma distribuição 
+Gaussiana a uma porcentagem específica de pixels da imagem.
+
+Permite selecionar
 canais específicos e fixar a semente (seed) de aleatoriedade para
 garantir reprodutibilidade.
 """
