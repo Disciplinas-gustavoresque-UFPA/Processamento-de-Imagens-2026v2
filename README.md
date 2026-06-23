@@ -39,7 +39,7 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 ## 🏆 Hall da Fama - Placar Semanal da Turma
 
-> 🤖 *Placar atualizado automaticamente em: 08/06/2026 00:20*
+> 🤖 *Placar atualizado automaticamente em: 22/06/2026 00:20*
 
 ### ⌨️ Jack Bauer do Código
 *Quem mais codificou na semana (Volume total de linhas mescladas)*
@@ -51,8 +51,8 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 <details><summary>Ver Top 3 completo</summary>
 
 🥇 @Motaromc (2171)
-🥈 @ygarasab (581)
-🥉 @alfa-m (505)
+🥈 @sayydaviid (1942)
+🥉 @alfa-m (671)
 
 </details>
 
@@ -90,7 +90,7 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 ![John Nash](/.github/images/memes/image_9.png)
 
-🥇 **@Motaromc** (2 badges acumuladas)
+🥇 **@Motaromc** (3 badges acumuladas)
 
 ---
 
