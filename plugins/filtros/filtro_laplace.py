@@ -21,10 +21,19 @@ class FiltroLaplace(PluginBase):
     def setup_ui(self) -> None:
         layout_principal = QVBoxLayout(self)
 
-        rotulo_modo = QLabel("Modo do filtro:", self)
-        layout_principal.addWidget(rotulo_modo)
+        rotulo_modo = QLabel(
+            "Modo do filtro:",
+            self,
+        )
 
-        self._grupo_opcoes = QButtonGroup(self)
+        layout_principal.addWidget(
+            rotulo_modo
+        )
+
+        self._grupo_opcoes = QButtonGroup(
+            self
+        )
+
         self._radios: dict[str, QRadioButton] = {}
 
         opcoes = [
@@ -33,21 +42,74 @@ class FiltroLaplace(PluginBase):
         ]
 
         for texto, valor in opcoes:
-            radio = QRadioButton(texto, self)
+            radio = QRadioButton(
+                texto,
+                self,
+            )
 
-            self._grupo_opcoes.addButton(radio)
+            self._grupo_opcoes.addButton(
+                radio
+            )
+
             self._radios[valor] = radio
 
-            layout_principal.addWidget(radio)
+            layout_principal.addWidget(
+                radio
+            )
 
-        self._radios["sem_filtro"].setChecked(True)
+        self._radios[
+            "sem_filtro"
+        ].setChecked(True)
 
         self._rotulo_status = QLabel(
             "Filtro atual: Sem Filtro",
             self,
         )
 
-        layout_principal.addWidget(self._rotulo_status)
+        layout_principal.addWidget(
+            self._rotulo_status
+        )
+
+        # Kernel
+        rotulo_kernel = QLabel(
+            "Tamanho do Kernel:",
+            self,
+        )
+
+        layout_principal.addWidget(
+            rotulo_kernel
+        )
+
+        self._grupo_kernel = QButtonGroup(
+            self
+        )
+
+        self._radios_kernel: dict[
+            int,
+            QRadioButton
+        ] = {}
+
+        for ksize in (1, 3, 5, 7):
+            radio = QRadioButton(
+                f"{ksize}x{ksize}",
+                self,
+            )
+
+            self._grupo_kernel.addButton(
+                radio
+            )
+
+            self._radios_kernel[
+                ksize
+            ] = radio
+
+            layout_principal.addWidget(
+                radio
+            )
+
+        self._radios_kernel[
+            3
+        ].setChecked(True)
 
         # Intensidade
         rotulo_intensidade_titulo = QLabel(
@@ -64,9 +126,17 @@ class FiltroLaplace(PluginBase):
             self,
         )
 
-        self._slider_intensidade.setMinimum(0)
-        self._slider_intensidade.setMaximum(300)
-        self._slider_intensidade.setValue(100)
+        self._slider_intensidade.setMinimum(
+            0
+        )
+
+        self._slider_intensidade.setMaximum(
+            300
+        )
+
+        self._slider_intensidade.setValue(
+            100
+        )
 
         layout_principal.addWidget(
             self._slider_intensidade
@@ -118,12 +188,22 @@ class FiltroLaplace(PluginBase):
                 self._ao_mudar_opcao
             )
 
+        for radio in self._radios_kernel.values():
+            radio.toggled.connect(
+                self._ao_mudar_kernel
+            )
+
         self._slider_intensidade.valueChanged.connect(
             self._ao_mudar_intensidade
         )
 
-        self.setLayout(layout_principal)
-        self.setMinimumWidth(320)
+        self.setLayout(
+            layout_principal
+        )
+
+        self.setMinimumWidth(
+            320
+        )
 
         QTimer.singleShot(
             100,
@@ -131,7 +211,9 @@ class FiltroLaplace(PluginBase):
         )
 
     def _obter_opcao(self) -> str:
-        for valor, radio in self._radios.items():
+        for valor, radio in (
+            self._radios.items()
+        ):
             if radio.isChecked():
                 return valor
 
@@ -139,8 +221,18 @@ class FiltroLaplace(PluginBase):
 
     def _obter_intensidade(self) -> float:
         return (
-            self._slider_intensidade.value() / 100.0
+            self._slider_intensidade.value()
+            / 100.0
         )
+
+    def _obter_kernel_size(self) -> int:
+        for ksize, radio in (
+            self._radios_kernel.items()
+        ):
+            if radio.isChecked():
+                return ksize
+
+        return 3
 
     def processar(
         self,
@@ -172,7 +264,7 @@ class FiltroLaplace(PluginBase):
         laplace = cv2.Laplacian(
             cinza,
             cv2.CV_64F,
-            ksize=3
+            ksize=self._obter_kernel_size()
         )
 
         laplace = cv2.convertScaleAbs(
@@ -214,6 +306,16 @@ class FiltroLaplace(PluginBase):
         self._rotulo_status.setText(
             f"Filtro atual: {self._radios[opcao].text()}"
         )
+
+        self._emitir_preview()
+
+    def _ao_mudar_kernel(
+        self,
+        marcado: bool
+    ) -> None:
+
+        if not marcado:
+            return
 
         self._emitir_preview()
 
