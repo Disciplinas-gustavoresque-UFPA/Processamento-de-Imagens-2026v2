@@ -108,7 +108,7 @@ class FiltroLaplace(PluginBase):
             )
 
         self._radios_kernel[
-            3
+            1
         ].setChecked(True)
 
         # Intensidade
@@ -244,11 +244,7 @@ class FiltroLaplace(PluginBase):
         if opcao == "sem_filtro":
             return imagem.copy()
 
-        possui_alpha = (
-            imagem.shape[2] == 4
-            if len(imagem.shape) == 3
-            else False
-        )
+        possui_alpha = len(imagem.shape) == 3 and imagem.shape[2] == 4
 
         if possui_alpha:
             rgb = imagem[..., :3]
