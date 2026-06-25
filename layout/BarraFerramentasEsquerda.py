@@ -151,6 +151,7 @@ class BarraFerramentasEsquerda(QFrame):
             ("Mover", pasta_icones / "hand.svg", "H"),
             ("Zoom", pasta_icones / "zoom.svg", "Z"),
             ("Rotação", None, "R"),
+            ("Recorte", pasta_icones / "crop.svg", "C"),
         ]
 
         for indice, (nome, caminho_icone, fallback) in enumerate(definicoes):
