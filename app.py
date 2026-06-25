@@ -233,8 +233,13 @@ def carregar_plugins_dinamicamente(
         caminho = os.path.join(diretorio, entrada)
         if os.path.isdir(caminho) and not entrada.startswith("_"):
             submenu = QMenu(_formatar_nome_menu(entrada), menu_pai)
-            menu_pai.addMenu(submenu)
+            
+            # Executa a recursão primeiro para tentar popular o submenu
             carregar_plugins_dinamicamente(submenu, caminho, janela_principal)
+            
+            # Adiciona ao menu pai APENAS se alguma ação (ou submenu com ações) foi inserida
+            if not submenu.isEmpty():
+                menu_pai.addMenu(submenu)
 
     # --- Depois pelos arquivos .py (criam QActions) ---
     for entrada in entradas:
