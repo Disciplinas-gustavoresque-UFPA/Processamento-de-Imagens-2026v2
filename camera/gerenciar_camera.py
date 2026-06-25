@@ -51,9 +51,24 @@ class DialogoCamera(QDialog):
         # Timer para atualizar o preview (30 FPS aproximadamente)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._atualizar_frame)
+        if not self.cap.isOpened():
+            self.label_video.setText("Não foi possível acessar a câmera.")
+            self.btn_capturar.setEnabled(False)
+            QMessageBox.warning(
+                self,
+                "Câmera indisponível",
+                "Não foi possível acessar a câmera. Verifique se há uma câmera "
+                "conectada e se ela não está em uso por outro aplicativo.",
+            )
+            self.liberar_camera()
+            return
+
         self.timer.start(30)
 
     def _atualizar_frame(self):
+        if not self.cap.isOpened():
+            return
+
         ret, frame = self.cap.read()
         if ret:
             self.frame_final = frame # Guarda o último frame lido
@@ -68,11 +83,21 @@ class DialogoCamera(QDialog):
             self.label_video.setPixmap(QPixmap.fromImage(imagem_qt).scaled(
                 self.label_video.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
             ))
+            return
+
+        if self.frame_final is None:
+            self.label_video.setText("Não foi possível ler frames da câmera.")
+
+    def liberar_camera(self):
+        """Para o preview e libera a câmera de forma idempotente."""
+        if self.timer.isActive():
+            self.timer.stop()
+        if self.cap is not None:
+            self.cap.release()
 
     def closeEvent(self, event):
         """Libera a câmera ao fechar a janela."""
-        self.timer.stop()
-        self.cap.release()
+        self.liberar_camera()
         super().closeEvent(event)
 
     def get_frame(self):
