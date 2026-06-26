@@ -684,6 +684,10 @@ class JanelaPrincipal(QMainWindow):
         acao_desfazer.setShortcut(QKeySequence.StandardKey.Undo)
         acao_desfazer.triggered.connect(self.desfazer)
         
+        acao_refazer = menu_editar.addAction("Refazer")
+        acao_refazer.setShortcut(QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_Y))
+        acao_refazer.triggered.connect(self.refazer)
+        
         # --- Menu Visualizar ---
         menu_visualizar = barra.addMenu("Visualizar")
 
