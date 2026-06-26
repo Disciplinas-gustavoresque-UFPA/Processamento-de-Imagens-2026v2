@@ -8,16 +8,28 @@ class Memento:
 
 class Historico:
     def __init__(self, limite=10):
-        self._estados = []
+        self._desfazer_pilha = []
+        self._refazer_pilha = []
         self._limite = limite
 
     def salvar(self, estado):
-        self._estados.append(Memento(estado.copy()))
+        # Sempre que uma nova ação limpa a linha do tempo do Redo
+        self._refazer_pilha.clear()
+        self._desfazer_pilha.append(Memento(estado.copy()))
 
-        if len(self._estados) > self._limite:
-            self._estados.pop(0)
+        if len(self._desfazer_pilha) > self._limite:
+            self._desfazer_pilha.pop(0)
 
-    def desfazer(self):
-        if not self._estados:
+    def desfazer(self, estado_atual):
+        if not self._desfazer_pilha:
             return None
-        return self._estados.pop().obter_estado()
+        # Guarda o estado atual da tela na pilha de refazer
+        self._refazer_pilha.append(Memento(estado_atual.copy()))
+        return self._desfazer_pilha.pop().obter_estado()
+
+    def refazer(self, estado_atual):
+        if not self._refazer_pilha:
+            return None
+        # Devolve o estado atual da tela para a pilha de desfazer
+        self._desfazer_pilha.append(Memento(estado_atual.copy()))
+        return self._refazer_pilha.pop().obter_estado()
