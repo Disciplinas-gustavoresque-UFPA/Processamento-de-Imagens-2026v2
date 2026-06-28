@@ -34,6 +34,9 @@ from PySide6.QtWidgets import (
     QStatusBar,
 )
 
+# Componentes personalizados
+from Componentes.ImagemLabel import ImageLabel
+
 # Garante que o diretório raiz do projeto esteja no sys.path para que os
 # plugins possam importar ``core.plugin_base`` sem ajustes manuais.
 _DIRETORIO_RAIZ = os.path.dirname(os.path.abspath(__file__))
@@ -142,6 +145,7 @@ def carregar_plugins_dinamicamente(
 class JanelaPrincipal(QMainWindow):
     """Janela principal do Studio de Processamento de Imagens."""
 
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Studio de Processamento de Imagens")
@@ -160,7 +164,10 @@ class JanelaPrincipal(QMainWindow):
 
     def _construir_interface(self) -> None:
         """Cria o widget central (área de visualização da imagem)."""
-        self._label_imagem = QLabel("Abra uma imagem para começar.", self)
+        self._label_imagem = ImageLabel(self)
+        # Conecta o sinal de movimento do mouse para atualizar as coordenadas na status bar
+        self._label_imagem.mouse_moved.connect(self._atualizar_coordenadas_mouse)
+
         self._label_imagem.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._label_imagem.setSizePolicy(
             QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored
@@ -174,6 +181,22 @@ class JanelaPrincipal(QMainWindow):
         self.setCentralWidget(area_rolagem)
 
         self.setStatusBar(QStatusBar(self))
+
+        # --- Labels da status bar ---
+        self._status_coordenadas = QLabel(" X: -, Y: - ")
+        self._status_msg = QLabel("")
+        self._status_nome = QLabel(" Imagem: - ")
+        self._status_resolucao = QLabel(" Resolução: --x-- ")
+        self._status_aspect = QLabel(" Aspect: -:- ")
+        self._reservado_zoom = QLabel(" [🔎 reservado] ")
+
+        # Adiciona na barra (ordem importa visualmente)
+        self.statusBar().addWidget(self._status_coordenadas)
+        self.statusBar().addWidget(self._status_msg, 1) # stretch=1 para ocupar espaço restante
+        self.statusBar().addPermanentWidget(self._status_nome)
+        self.statusBar().addPermanentWidget(self._status_resolucao)
+        self.statusBar().addPermanentWidget(self._status_aspect)
+        self.statusBar().addPermanentWidget(self._reservado_zoom)
 
     def _construir_menus(self) -> None:
         """Cria a barra de menus com Arquivo e Filtros (plugins)."""
@@ -218,7 +241,13 @@ class JanelaPrincipal(QMainWindow):
 
         self._imagem_atual = imagem_bgr
         self._exibir_imagem(imagem_bgr)
-        self.statusBar().showMessage(f"Imagem carregada: {caminho}")
+        self._status_msg.setText(f"Imagem carregada: {caminho}")
+        
+        self._imagem_atual = imagem_bgr
+        self._caminho_imagem = caminho  # <-- salvar caminho
+        self._exibir_imagem(imagem_bgr)
+
+        self._atualizar_info_imagem()
 
     def abrir_plugin(self, classe_plugin: type) -> None:
         """
@@ -267,7 +296,7 @@ class JanelaPrincipal(QMainWindow):
         """Substitui a imagem de trabalho pela imagem processada."""
         self._imagem_atual = cv2.cvtColor(imagem_rgb, cv2.COLOR_RGB2BGR)
         self._imagem_backup = None
-        self.statusBar().showMessage("Filtro aplicado com sucesso.")
+        self._status_msg.setText("Filtro aplicado.")
 
     def _restaurar_backup(self) -> None:
         """Restaura a imagem ao estado anterior à abertura do plugin."""
@@ -305,7 +334,49 @@ class JanelaPrincipal(QMainWindow):
         )
         self._label_imagem.setPixmap(pixmap_escalado)
 
+    def _atualizar_info_imagem(self) -> None:
+        if self._imagem_atual is None:
+            return
 
+        # Nome
+        nome = os.path.basename(self._caminho_imagem)
+        self._status_nome.setText(f"Imagem: {nome}")
+
+        # Resolução
+        h, w = self._imagem_atual.shape[:2]
+        self._status_resolucao.setText(f"{w} x {h}")
+
+        # Aspect Ratio
+        from math import gcd
+        divisor = gcd(w, h) # Obteção o maior divisor comum (mdc) para simplificar a razão
+        aspect = f"{w//divisor}:{h//divisor}"
+        self._status_aspect.setText(f"Aspect: {aspect}")
+
+    def _atualizar_coordenadas_mouse(self, event):
+        if self._imagem_atual is None or self._label_imagem.pixmap() is None:
+            return
+
+        pixmap = self._label_imagem.pixmap()
+        label_size = self._label_imagem.size()
+        pixmap_size = pixmap.size()
+
+        # offsets (imagem centralizada)
+        offset_x = (label_size.width() - pixmap_size.width()) / 2
+        offset_y = (label_size.height() - pixmap_size.height()) / 2
+
+        x = event.position().x() - offset_x
+        y = event.position().y() - offset_y
+
+        if 0 <= x < pixmap_size.width() and 0 <= y < pixmap_size.height():
+            # escala para imagem real
+            img_h, img_w = self._imagem_atual.shape[:2]
+
+            real_x = int(x * img_w / pixmap_size.width())
+            real_y = int(y * img_h / pixmap_size.height())
+
+            self._status_coordenadas.setText(f"X: {real_x}, Y: {real_y}")
+        else:
+            self._status_coordenadas.setText("X: -, Y: -")
 # ---------------------------------------------------------------------------
 # Ponto de entrada
 # ---------------------------------------------------------------------------
