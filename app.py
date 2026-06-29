@@ -731,7 +731,7 @@ class JanelaPrincipal(QMainWindow):
             aviso = menu_filtros.addAction("(nenhum plugin encontrado)")
             aviso.setEnabled(False)
 
-        # --- Menu Deteccao (pontos e caracteristicas da imagem) ---
+        # --- Menu Detecção (pontos e características da imagem) ---
         menu_deteccao = barra.addMenu("Detecção")
         diretorio_deteccao = os.path.join(
             _DIRETORIO_RAIZ, "plugins", "deteccao"
