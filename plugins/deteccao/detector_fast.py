@@ -1,7 +1,8 @@
-"""Plugin para deteccao de cantos com o algoritmo FAST."""
+"""Plugin para detecção de cantos com o algoritmo FAST."""
 
+import cv2
 import numpy as np
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QHBoxLayout,
@@ -15,7 +16,7 @@ from core.plugin_base import PluginBase
 
 
 class DetectorFAST(PluginBase):
-    """Interface do detector de pontos de interesse FAST."""
+    """Detecta e marca pontos de interesse FAST na imagem."""
 
     display_name = "Detector de Cantos (FAST)"
 
@@ -42,10 +43,10 @@ class DetectorFAST(PluginBase):
         )
         layout.addWidget(self._slider_limiar)
 
-        self._checkbox_nms = QCheckBox("Supressão de não-maximos", self)
+        self._checkbox_nms = QCheckBox("Supressão de não-máximos", self)
         self._checkbox_nms.setChecked(True)
         self._checkbox_nms.setToolTip(
-            "Mantem os pontos mais fortes quando ha varias deteccões próximas."
+            "Mantém os pontos mais fortes quando há várias detecções próximas."
         )
         layout.addWidget(self._checkbox_nms)
 
@@ -70,10 +71,46 @@ class DetectorFAST(PluginBase):
 
         self.setMinimumWidth(360)
 
+        QTimer.singleShot(0, self._atualizar_preview)
+
+    def _detectar(self, imagem: np.ndarray) -> tuple[np.ndarray, int]:
+        """Retorna uma cópia RGB anotada e a quantidade de cantos detectados."""
+        if imagem.ndim == 3:
+            cinza = cv2.cvtColor(imagem, cv2.COLOR_RGB2GRAY)
+            resultado = imagem.copy()
+        elif imagem.ndim == 2:
+            cinza = imagem
+            resultado = cv2.cvtColor(imagem, cv2.COLOR_GRAY2RGB)
+        else:
+            raise ValueError("A imagem deve possuir um canal ou três canais RGB.")
+
+        detector = cv2.FastFeatureDetector_create(
+            threshold=self._slider_limiar.value(),
+            nonmaxSuppression=self._checkbox_nms.isChecked(),
+            type=cv2.FAST_FEATURE_DETECTOR_TYPE_9_16,
+        )
+
+        pontos = detector.detect(cinza, None)
+
+        imagem_anotada = cv2.drawKeypoints(
+            resultado,
+            pontos,
+            None,
+            color=(255, 0, 0),
+            flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS,
+        )
+
+        return imagem_anotada, len(pontos)
+
     def processar(self, imagem: np.ndarray) -> np.ndarray:
-        """Retorna uma copia da imagem original.
-        """
-        return imagem.copy()
+        """Aplica o FAST e devolve a imagem RGB com os cantos marcados."""
+        resultado, _ = self._detectar(imagem)
+        return resultado
+
+    def _atualizar_quantidade(self) -> np.ndarray:
+        resultado, quantidade = self._detectar(self.imagem_original)
+        self._rotulo_quantidade.setText(f"Cantos detectados: {quantidade}")
+        return resultado
 
     def _ao_alterar_limiar(self, valor: int) -> None:
         self._rotulo_limiar.setText(f"Limiar de intensidade: {valor}")
@@ -83,13 +120,13 @@ class DetectorFAST(PluginBase):
         if not hasattr(self, "imagem_original") or self.imagem_original is None:
             return
 
-        imagem_processada = self.processar(self.imagem_original)
+        imagem_processada = self._atualizar_quantidade()
         self.preview_requested.emit(imagem_processada)
 
     def _ao_aplicar(self) -> None:
         if not hasattr(self, "imagem_original") or self.imagem_original is None:
             return
 
-        imagem_processada = self.processar(self.imagem_original)
+        imagem_processada = self._atualizar_quantidade()
         self.apply_requested.emit(imagem_processada)
         self.accept()
