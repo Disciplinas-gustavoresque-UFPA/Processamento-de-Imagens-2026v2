@@ -119,3 +119,17 @@ class FiltroSobel(PluginBase):
         # garante que os valores estejam entre 0 e 255 e converte de volta para 8 bits
         resultado = np.clip(magnitude, 0, 255).astype(np.uint8)
         return cv2.cvtColor(resultado, cv2.COLOR_GRAY2RGB)
+    
+    def _ao_mudar_escala(self, valor: int) -> None:
+        """
+        O método _ao_mudar_escala atualiza o rótulo de texto e gera a pré-visualização em tempo real ao processar a imagem com a nova escala. 
+        
+        Recebe o valor inteiro do slider e emite um sinal. 
+        
+        Não possui retorno.
+            
+        """
+        escala = valor / 10.0
+        self.rotulo_escala.setText(f"Escala da magnitude: {escala:.1f}x")
+        imagem_processada = self.processar(self.imagem_original)
+        self.preview_requested.emit(imagem_processada)
