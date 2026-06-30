@@ -1299,6 +1299,16 @@ class JanelaPrincipal(QMainWindow):
             self._ferramenta_ativa_toolbar = "mover"
             self._toolbar_esquerda.selecionar_ferramenta_por_nome("mover")
             return
+        if ferramenta == "recorte":
+            # Abre o diálogo de recorte
+            if not isinstance(aba_atual, DocumentoImagem):
+                return
+
+            self._abrir_plugin_recortar_imagem()
+
+            self._ferramenta_ativa_toolbar = "mover"
+            self._toolbar_esquerda.selecionar_ferramenta_por_nome("mover")
+            return
 
         if visualizador is None:
             return
@@ -1365,6 +1375,23 @@ class JanelaPrincipal(QMainWindow):
             return
 
         self.abrir_plugin(TransformacoesGeometricas)
+    
+    def _abrir_plugin_recortar_imagem(self) -> None:
+        """Abre o diálogo de recorte de imagem."""
+        try:
+            from plugins.imagem.transformar.recortar_imagem import (
+            RecortarImagem,
+            )
+        except Exception as erro:
+            QMessageBox.critical(
+            self,
+            "Erro",
+            "Falha ao carregar o plugin de recorte.\n\n"
+            f"Detalhes: {erro}",
+            )
+            return
+
+        self.abrir_plugin(RecortarImagem)    
 
     def _atualizar_visibilidade_laterais(self, imagem_ativa: bool) -> None:
         """Mostra ou oculta as barras laterais conforme a tela ativa."""
