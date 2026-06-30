@@ -61,7 +61,7 @@ class FiltroSobel(PluginBase):
         self.btn_cancelar.clicked.connect(self.reject)
 
         self.setLayout(layout)
-        self.setMinimumWidth(320)
+        self.setMinimumWidth(420)
         self._ao_mudar_escala(self.slider_escala.value())
 
     def _obter_escala(self) -> float:
@@ -108,6 +108,7 @@ class FiltroSobel(PluginBase):
             dtype=np.float32,
         )
 
+        # para evitar gradientes negativos sejam cortados em zero, mantendo as bordas de transição claro-para-escuro e escuro-para-claro.
         # convolução usando os kernels Sobel com tipo de dado de precisão maior (float64)
         img_sobel_x = cv2.filter2D(gray, cv2.CV_64F, kernel_x)
         img_sobel_y = cv2.filter2D(gray, cv2.CV_64F, kernel_y)
@@ -116,7 +117,7 @@ class FiltroSobel(PluginBase):
         magnitude = cv2.magnitude(img_sobel_x, img_sobel_y)
         magnitude *= self._obter_escala()
 
-        # garante que os valores estejam entre 0 e 255 e converte de volta para 8 bits
+        # tratamento de saturação: garante que os valores estejam entre 0 e 255 e converte de volta para 8 bits
         resultado = np.clip(magnitude, 0, 255).astype(np.uint8)
         return cv2.cvtColor(resultado, cv2.COLOR_GRAY2RGB)
     
@@ -133,3 +134,15 @@ class FiltroSobel(PluginBase):
         self.rotulo_escala.setText(f"Escala da magnitude: {escala:.1f}x")
         imagem_processada = self.processar(self.imagem_original)
         self.preview_requested.emit(imagem_processada)
+
+    def _ao_aplicar(self) -> None:
+        """
+        O método _ao_aplicar confirma as alterações ao processar a imagem uma última vez. 
+
+        Emite o sinal apply_requested com o resultado final e fecha a janela (accept). 
+        
+        Recebe apenas self e não possui retorno.
+        """
+        img_processada = self.processar(self.imagem_original)
+        self.apply_requested.emit(img_processada)
+        self.accept()
