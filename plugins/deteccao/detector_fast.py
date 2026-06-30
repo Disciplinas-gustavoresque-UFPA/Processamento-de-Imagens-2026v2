@@ -1,4 +1,4 @@
-"""Plugin para detecção de cantos com o algoritmo FAST."""
+"""Plugin de detecção de cantos baseado no algoritmo FAST, com suporte a supressão de não-máximos e ajuste dinâmico de limiar."""
 
 import cv2
 import numpy as np
@@ -11,9 +11,7 @@ from PySide6.QtWidgets import (
     QSlider,
     QVBoxLayout,
 )
-
 from core.plugin_base import PluginBase
-
 
 class DetectorFAST(PluginBase):
     """Detecta e marca pontos de interesse FAST na imagem."""
