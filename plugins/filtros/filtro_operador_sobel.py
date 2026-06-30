@@ -1,18 +1,18 @@
 """
-# plugins/bordas/filtro_sobel.py
-# -----------------------------------------
-# Plugin: Detecção de bordas via Operador Sobel.
-# 
-# Etapas:
-# 1) Conversão da imagem RGB para escala de cinzentos.
-# 2) Convolução com kernels 3x3 para derivadas espaciais (X e Y).
-# 3) Cálculo da magnitude do gradiente com ajuste de escala e normalização.
-# 
-# Detalhes:
-# * Kernel X: Destaca linhas verticais.
-# * Kernel Y: Destaca linhas horizontais.
-# * Reduz ruídos devido à suavização integrada (peso 2 no centro).
-# * Usa float64 (cv2.CV_64F) e normaliza para uint8 com np.clip().
+plugins/bordas/filtro_sobel.py
+-----------------------------------------
+Plugin: Detecção de bordas via Operador Sobel.
+ 
+Etapas:
+1) Conversão da imagem RGB para escala de cinzentos.
+2) Convolução com kernels 3x3 para derivadas espaciais (X e Y).
+3) Cálculo da magnitude do gradiente com ajuste de escala e normalização.
+ 
+Detalhes:
+* Kernel X: Destaca linhas verticais.
+* Kernel Y: Destaca linhas horizontais.
+* Reduz ruídos devido à suavização integrada (peso 2 no centro).
+* Usa float64 (cv2.CV_64F) e normaliza para uint8 com np.clip().
 
 """
 import cv2
@@ -140,7 +140,7 @@ class FiltroSobel(PluginBase):
         O método _ao_aplicar confirma as alterações ao processar a imagem uma última vez. 
 
         Emite o sinal apply_requested com o resultado final e fecha a janela (accept). 
-        
+
         Recebe apenas self e não possui retorno.
         """
         img_processada = self.processar(self.imagem_original)
