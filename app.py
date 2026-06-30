@@ -202,7 +202,6 @@ def _formatar_nome_menu(nome_pasta: str) -> str:
     return nome_pasta.capitalize()
 
 
-
 def carregar_plugins_dinamicamente(
     menu_pai: QMenu,
     diretorio: str,
@@ -261,7 +260,6 @@ def carregar_plugins_dinamicamente(
                     lambda _checked=False, cls=classe_plugin: janela_principal.abrir_plugin(cls)
                 )
 
-    
 # ---------------------------------------------------------------------------
 # Classes de Estado
 # ---------------------------------------------------------------------------
@@ -273,8 +271,6 @@ class DocumentoImagem(QWidget):
     """
     # Cria um sinal para repassar a alteração de zoom para a janela principal
     zoom_alterado = Signal(float)
-
-    
 
     def __init__(self, caminho_arquivo: str, imagem_bgr: np.ndarray, parent=None):
         super().__init__(parent)
