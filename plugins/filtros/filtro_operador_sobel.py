@@ -15,4 +15,12 @@
 # * Usa float64 (cv2.CV_64F) e normaliza para uint8 com np.clip().
 
 """
+import cv2
+import numpy as np
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QSlider, QVBoxLayout
 
+from core.plugin_base import PluginBase
+
+class FiltroSobel(PluginBase):
+    display_name = "Operador Sobel"
