@@ -234,8 +234,13 @@ def carregar_plugins_dinamicamente(
         caminho = os.path.join(diretorio, entrada)
         if os.path.isdir(caminho) and not entrada.startswith("_"):
             submenu = QMenu(_formatar_nome_menu(entrada), menu_pai)
-            menu_pai.addMenu(submenu)
+            
+            # Executa a recursão primeiro para tentar popular o submenu
             carregar_plugins_dinamicamente(submenu, caminho, janela_principal)
+            
+            # Adiciona ao menu pai APENAS se alguma ação (ou submenu com ações) foi inserida
+            if not submenu.isEmpty():
+                menu_pai.addMenu(submenu)
 
     # --- Depois pelos arquivos .py (criam QActions) ---
     for entrada in entradas:
@@ -728,6 +733,17 @@ class JanelaPrincipal(QMainWindow):
 
         if not _menu_tem_acao_folha(menu_filtros):
             aviso = menu_filtros.addAction("(nenhum plugin encontrado)")
+            aviso.setEnabled(False)
+
+        # --- Menu Detecção (pontos e características da imagem) ---
+        menu_deteccao = barra.addMenu("Detecção")
+        diretorio_deteccao = os.path.join(
+            _DIRETORIO_RAIZ, "plugins", "deteccao"
+        )
+        carregar_plugins_dinamicamente(menu_deteccao, diretorio_deteccao, self)
+
+        if not _menu_tem_acao_folha(menu_deteccao):
+            aviso = menu_deteccao.addAction("(nenhum plugin encontrado)")
             aviso.setEnabled(False)
 
         # --- Menu Reconhecimento (leitura e identificação de padrões) ---

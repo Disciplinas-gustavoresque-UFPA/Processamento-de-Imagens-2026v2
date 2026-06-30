@@ -39,7 +39,7 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 ## 🏆 Hall da Fama - Placar Semanal da Turma
 
-> 🤖 *Placar atualizado automaticamente em: 15/06/2026 00:21*
+> 🤖 *Placar atualizado automaticamente em: 29/06/2026 00:19*
 
 ### ⌨️ Jack Bauer do Código
 *Quem mais codificou na semana (Volume total de linhas mescladas)*
@@ -52,7 +52,7 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 🥇 @Motaromc (2171)
 🥈 @sayydaviid (1942)
-🥉 @ygarasab (581)
+🥉 @alfa-m (1219)
 
 </details>
 
@@ -63,7 +63,7 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 ![John Coffey](/.github/images/memes/image_6.png)
 
-🥇 **Ainda não há registros.**
+🥇 **@antenoraires** (1 badges acumuladas)
 
 ---
 
@@ -72,7 +72,7 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 ![Bug Catcher](/.github/images/memes/image_7.png)
 
-🥇 **Ainda não há registros.**
+🥇 **@alfa-m** (1 badges acumuladas)
 
 ---
 
@@ -90,7 +90,14 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 ![John Nash](/.github/images/memes/image_9.png)
 
-🥇 **@Motaromc** (2 badges acumuladas)
+🥇 **@Motaromc** (3 badges acumuladas)
+
+<details><summary>Ver Top 3 completo</summary>
+
+🥇 @Motaromc (3)
+🥈 @alfa-m (1)
+
+</details>
 
 ---
 
@@ -99,7 +106,7 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 ![Da Vinci](/.github/images/memes/image_10.png)
 
-🥇 **Ainda não há registros.**
+🥇 **@alfa-m** (1 badges acumuladas)
 
 ---
 
@@ -135,7 +142,14 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 ![Heimdall](/.github/images/memes/image_14.png)
 
-🥇 **Ainda não há registros.**
+🥇 **@lorenarss** (1 badges acumuladas)
+
+<details><summary>Ver Top 3 completo</summary>
+
+🥇 @lorenarss (1)
+🥈 @alfa-m (1)
+
+</details>
 
 ---
 
