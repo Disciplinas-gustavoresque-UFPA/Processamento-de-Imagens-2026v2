@@ -28,7 +28,11 @@ class FiltroSobel(PluginBase):
 
     def setup_ui(self) -> None:
         """
-        Função que cria a interface do plugin com slider de ajuste do limiar e botões Aplicar/Cancelar.
+        O método setup_ui cria a interface do plugin com layout vertical. 
+        
+        Define um rótulo informativo, botões de ação e um slider horizontal (escala de 0.1x a 4.0x) interligados a eventos. 
+        
+        Não tem argumentos nem retorno.
         """
         layout = QVBoxLayout(self)
 
@@ -62,7 +66,56 @@ class FiltroSobel(PluginBase):
 
     def _obter_escala(self) -> float:
         """
-        Retorna o valor do slider dividido por 10 para obter a escala desejada.
+        O método _obter_escala converte o valor inteiro do slider (1 a 40) para um fator de ponto flutuante (0.1 a 4.0), dividindo-o por 10. 
+        
+        Não possui parâmetros externos além de self. 
+        
+        Retorna um valor float.
         
         """
         return self.slider_escala.value() / 10.0 
+    
+    def processar(self, imagem: np.ndarray) -> np.ndarray:
+        """
+        O método processar converte uma imagem RGB para cinza e usa convolução com kernels 3x3 do Operador Sobel para extrair as derivadas X e Y. 
+        
+        Calcula a magnitude do gradiente, aplica escala e normaliza em uint8 [0-255]. 
+        
+        Retorna em RGB.
+        """
+
+        # 1º Converte a imagem RGB para escala de cinza
+        if len(imagem.shape) == 3:
+            gray = cv2.cvtColor(imagem, cv2.COLOR_RGB2GRAY)
+        else:
+            gray = imagem.copy()
+
+        # definição dos kernels Sobel (dando maior peso ao elemento central)
+        kernel_x = np.array(
+            [
+                [-1, 0, 1],
+                [-2, 0, 2],
+                [-1, 0, 1],
+            ],
+            dtype=np.float32,
+        )
+        kernel_y = np.array(
+            [
+                [-1, -2, -1],
+                [0, 0, 0],
+                [1, 2, 1],
+            ],
+            dtype=np.float32,
+        )
+
+        # convolução usando os kernels Sobel com tipo de dado de precisão maior (float64)
+        img_sobel_x = cv2.filter2D(gray, cv2.CV_64F, kernel_x)
+        img_sobel_y = cv2.filter2D(gray, cv2.CV_64F, kernel_y)
+
+        # calcula a magnitude do vetor gradiente (raiz quadrada da soma dos quadrados)
+        magnitude = cv2.magnitude(img_sobel_x, img_sobel_y)
+        magnitude *= self._obter_escala()
+
+        # garante que os valores estejam entre 0 e 255 e converte de volta para 8 bits
+        resultado = np.clip(magnitude, 0, 255).astype(np.uint8)
+        return cv2.cvtColor(resultado, cv2.COLOR_GRAY2RGB)
