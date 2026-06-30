@@ -60,3 +60,9 @@ class FiltroSobel(PluginBase):
         self.setMinimumWidth(320)
         self._ao_mudar_escala(self.slider_escala.value())
 
+    def _obter_escala(self) -> float:
+        """
+        Retorna o valor do slider dividido por 10 para obter a escala desejada.
+        
+        """
+        return self.slider_escala.value() / 10.0 
