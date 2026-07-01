@@ -8,9 +8,10 @@ Cada plugin deve herdar de ``PluginBase`` e implementar os métodos abstratos
 """
 
 from abc import abstractmethod
+from typing import Optional
 
 import numpy as np
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QPoint, QRect, Signal
 from PySide6.QtWidgets import QDialog
 
 
@@ -34,7 +35,7 @@ class PluginBase(QDialog):
     # Subclasses devem definir este atributo para nomear o plugin nos menus.
     display_name: str = "Plugin sem nome"
 
-    def __init__(self, imagem: np.ndarray, parent=None):
+    def __init__(self, imagem: np.ndarray, parent=None, selecao_retangular: Optional[QRect] = None):
         """
         Parâmetros
         ----------
@@ -42,9 +43,12 @@ class PluginBase(QDialog):
             Imagem original em formato RGB (H × W × 3, dtype uint8).
         parent : QWidget, opcional
             Widget pai do diálogo.
+        selecao_retangular : Optional[QRect]
+            Região selecionada em coordenadas de imagem.
         """
         super().__init__(parent)
         self.imagem_original: np.ndarray = imagem.copy()
+        self.selecao_retangular: Optional[QRect] = selecao_retangular
         self.setWindowTitle(self.display_name)
         self.setup_ui()
 
