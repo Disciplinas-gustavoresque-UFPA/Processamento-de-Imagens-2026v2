@@ -10,7 +10,7 @@ Cada plugin deve herdar de ``PluginBase`` e implementar os métodos abstratos
 from abc import abstractmethod
 
 import numpy as np
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QDialog
 
 
@@ -43,10 +43,21 @@ class PluginBase(QDialog):
         parent : QWidget, opcional
             Widget pai do diálogo.
         """
-        super().__init__(parent)
+        super().__init__(None)
+        self._janela_pai = parent
         self.imagem_original: np.ndarray = imagem.copy()
         self.setWindowTitle(self.display_name)
         self.setup_ui()
+
+        # Centraliza o diálogo sobre a janela pai (reproduz o
+        # comportamento que o Qt faria automaticamente com parent).
+        if parent is not None:
+            geo_pai = parent.geometry()
+            self.adjustSize()
+            x = geo_pai.x() + (geo_pai.width() - self.width()) // 2
+            y = geo_pai.y() + (geo_pai.height() - self.height()) // 2
+            self.move(x, y)
+
 
     @abstractmethod
     def setup_ui(self) -> None:
