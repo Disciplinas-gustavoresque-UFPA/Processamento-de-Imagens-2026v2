@@ -826,6 +826,8 @@ class JanelaPrincipal(QMainWindow):
         if mensagem_status:
             self.statusBar().showMessage(mensagem_status)
 
+        self._sidebar_direita.atualizar_compressao(imagem_bgr)
+
         return novo_documento
 
     def _carregar_imagem_do_caminho(self, caminho: str) -> None:
@@ -1202,6 +1204,9 @@ class JanelaPrincipal(QMainWindow):
 
         self.statusBar().showMessage("Filtro aplicado com sucesso.")
 
+        if self.tabs.currentWidget() == aba:
+            self._sidebar_direita.atualizar_compressao(imagem_bgr)
+
     def _ao_aplicar_multiplas_imagens(self, imagens_rgb, aba_atual):
         """Cria novas abas a partir de múltiplas imagens RGB geradas por um plugin."""
         if not isinstance(aba_atual, DocumentoImagem):
@@ -1253,6 +1258,8 @@ class JanelaPrincipal(QMainWindow):
             )
 
         self.statusBar().showMessage("Desfazer realizado.")
+
+        self._sidebar_direita.atualizar_compressao(estado)
 
     def _restaurar_backup(self) -> None:
         """Restaura a imagem da aba atual ao estado anterior."""
@@ -1375,6 +1382,7 @@ class JanelaPrincipal(QMainWindow):
         if indice == -1: # Nenhuma aba aberta (fechou tudo)
             self._imagem_atual = None
             self._ao_zoom_alterado(1.0)
+            self._sidebar_direita.atualizar_compressao(None)
             return
 
         aba_atual = self.tabs.widget(indice)
@@ -1385,11 +1393,13 @@ class JanelaPrincipal(QMainWindow):
             self._ao_zoom_alterado(zoom_atual)
             if self._ferramenta_ativa_toolbar in {"mover", "zoom"}:
                 self._ao_ferramenta_alterada(self._ferramenta_ativa_toolbar)
+            self._sidebar_direita.atualizar_compressao(aba_atual.imagem_atual)
             return
 
         self._imagem_atual = None
         self._atualizar_visibilidade_laterais(False)
         self._ao_zoom_alterado(1.0)
+        self._sidebar_direita.atualizar_compressao(None)
 
     def keyPressEvent(self, evento) -> None:
         """Atalhos globais."""
