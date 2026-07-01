@@ -684,6 +684,10 @@ class JanelaPrincipal(QMainWindow):
         acao_desfazer.setShortcut(QKeySequence.StandardKey.Undo)
         acao_desfazer.triggered.connect(self.desfazer)
         
+        acao_refazer = menu_editar.addAction("Refazer")
+        acao_refazer.setShortcut(QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_Y))
+        acao_refazer.triggered.connect(self.refazer)
+        
         # --- Menu Visualizar ---
         menu_visualizar = barra.addMenu("Visualizar")
 
@@ -1229,30 +1233,39 @@ class JanelaPrincipal(QMainWindow):
         self.statusBar().showMessage("Canais RGB gerados em abas separadas.")
 
     def desfazer(self) -> None:
-        """Desfaz a última operação aplicada."""
+        """Desfaz a última alteração na imagem da aba ativa."""
         aba_atual = self.tabs.currentWidget()
-
         if not isinstance(aba_atual, DocumentoImagem):
             return
 
-        estado = aba_atual.historico.desfazer()
-
-        if estado is None:
+        # Passamos a imagem atual para que ela vá para a pilha de refazer
+        imagem_anterior = aba_atual.historico.desfazer(aba_atual.imagem_atual)
+        
+        # CORREÇÃO: Altere de 'is None' para 'is not None'
+        if imagem_anterior is not None:
+            aba_atual.imagem_atual = imagem_anterior
+            self._imagem_atual = imagem_anterior  # Atualiza a referência global da janela
+            aba_atual.atualizar_visualizacao(imagem_anterior, ajustar_a_janela=False)
+            self.statusBar().showMessage("Desfeito com sucesso.")
+        else:
             self.statusBar().showMessage("Nada para desfazer.")
+
+    def refazer(self) -> None:
+        """Refaz a última alteração desfeita na imagem da aba ativa (Ctrl+Y)."""
+        aba_atual = self.tabs.currentWidget()
+        if not isinstance(aba_atual, DocumentoImagem):
             return
 
-        aba_atual.imagem_atual = estado
-        aba_atual.atualizar_visualizacao(estado)
-
-        # Atualiza miniatura da aba
-        indice_aba = self.tabs.indexOf(aba_atual)
-        if indice_aba != -1:
-            self.tabs.setTabIcon(
-                indice_aba,
-                self._gerar_icone_miniatura(estado)
-            )
-
-        self.statusBar().showMessage("Desfazer realizado.")
+        # Pede ao histórico o estado que foi anteriormente desfeito
+        imagem_proxima = aba_atual.historico.refazer(aba_atual.imagem_atual)
+        
+        if imagem_proxima is not None:
+            aba_atual.imagem_atual = imagem_proxima
+            self._imagem_atual = imagem_proxima  # Atualiza a referência global da janela
+            aba_atual.atualizar_visualizacao(imagem_proxima, ajustar_a_janela=False)
+            self.statusBar().showMessage("Refito com sucesso.")
+        else:
+            self.statusBar().showMessage("Nada para refazer.")
 
     def _restaurar_backup(self) -> None:
         """Restaura a imagem da aba atual ao estado anterior."""
