@@ -37,7 +37,6 @@ class FiltroDilatacao(PluginBase):
 
         # --- Informativo ---
         self.info = QLabel(
-            "Filtro Morfológico — Dilatação\n\n"
             "Expande regiões claras da imagem, preenchendo\n"
             "pequenos buracos e conectando componentes próximos.",
             self,

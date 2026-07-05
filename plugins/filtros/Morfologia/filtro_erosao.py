@@ -37,7 +37,6 @@ class FiltroErosao(PluginBase):
 
         # --- Informativo ---
         self.info = QLabel(
-            "Filtro Morfológico — Erosão\n\n"
             "Reduz regiões claras da imagem, removendo\n"
             "pequenas saliências e separando componentes\n"
             "conectados por pontes estreitas.",
