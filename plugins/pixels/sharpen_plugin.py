@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QSlider,
     QPushButton,
     QHBoxLayout,
+    QComboBox
 )
 
 from core.plugin_base import PluginBase
@@ -19,18 +20,27 @@ class SharpenPlugin(PluginBase):
     def setup_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        # Label
-        self.label = QLabel("Intensidade: 1.0")
+        self.label_filtro = QLabel("Filtro de Borramento:")
+        self.combo_filtro = QComboBox()
+        self.combo_filtro.addItems(["Gaussiano", "Média", "Mediano"])
+        self.combo_filtro.currentIndexChanged.connect(self._on_change)
 
-        # Slider
-        self.slider = QSlider(Qt.Horizontal)
-        self.slider.setMinimum(0)
-        self.slider.setMaximum(300) 
-        self.slider.setValue(0)
+        # Slider de Intensidade (Alpha)
+        self.label_intensidade = QLabel("Intensidade (Alpha): 1.00")
+        self.slider_intensidade = QSlider(Qt.Horizontal)
+        self.slider_intensidade.setMinimum(0)
+        self.slider_intensidade.setMaximum(300)
+        self.slider_intensidade.setValue(100) # Inicializa em 1.0
+        self.slider_intensidade.valueChanged.connect(self._on_change)
 
-        self.slider.valueChanged.connect(self._on_change)
+        # Slider de Fator do Residual (Raio)
+        self.label_raio = QLabel("Raio (Fator do Residual): 4.0")
+        self.slider_raio = QSlider(Qt.Horizontal)
+        self.slider_raio.setMinimum(1)
+        self.slider_raio.setMaximum(500)
+        self.slider_raio.setValue(40)
+        self.slider_raio.valueChanged.connect(self._on_change)
 
-        # Botões
         btn_layout = QHBoxLayout()
 
         self.btn_apply = QPushButton("Aplicar")
@@ -42,17 +52,29 @@ class SharpenPlugin(PluginBase):
         btn_layout.addWidget(self.btn_apply)
         btn_layout.addWidget(self.btn_cancel)
 
-        # Layout final
-        layout.addWidget(self.label)
-        layout.addWidget(self.slider)
+        layout.addWidget(self.label_filtro)
+        layout.addWidget(self.combo_filtro)
+        layout.addSpacing(10)
+        layout.addWidget(self.label_intensidade)
+        layout.addWidget(self.slider_intensidade)
+        layout.addSpacing(10)
+        layout.addWidget(self.label_raio)
+        layout.addWidget(self.slider_raio)
+        layout.addSpacing(10)
         layout.addLayout(btn_layout)
 
     def _intensity(self) -> float:
-        return self.slider.value() / 100.0
+        return self.slider_intensidade.value() / 100.0
 
-    def _on_change(self):
-        value = self._intensity()
-        self.label.setText(f"Intensidade: {value:.2f}")
+    def _radius(self) -> float:
+        return self.slider_raio.value() / 10.0
+
+    def _on_change(self, *args):
+        val_intensidade = self._intensity()
+        val_raio = self._radius()
+
+        self.label_intensidade.setText(f"Intensidade (Alpha): {val_intensidade:.2f}")
+        self.label_raio.setText(f"Raio (Fator do Residual): {val_raio:.1f}")
 
         preview = self.processar(self.imagem_original)
         self.preview_requested.emit(preview)
@@ -64,11 +86,20 @@ class SharpenPlugin(PluginBase):
 
     def processar(self, imagem: np.ndarray) -> np.ndarray:
         alpha = self._intensity()
+        raio = self._radius()
+        tipo_filtro = self.combo_filtro.currentText()
 
-        # blur leve
-        blurred = cv2.GaussianBlur(imagem, (0, 0), sigmaX=4)
+        if tipo_filtro == "Gaussiano":
+            blurred = cv2.GaussianBlur(imagem, (0, 0), sigmaX=raio)
 
-        # unsharp mask
+        elif tipo_filtro == "Média":
+            k_size = int(raio) * 2 + 1
+            blurred = cv2.blur(imagem, (k_size, k_size))
+
+        elif tipo_filtro == "Mediano":
+            k_size = int(raio) * 2 + 1
+            blurred = cv2.medianBlur(imagem, k_size)
+
         sharpened = cv2.addWeighted(
             imagem, 1 + alpha,
             blurred, -alpha,
