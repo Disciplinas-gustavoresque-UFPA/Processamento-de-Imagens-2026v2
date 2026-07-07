@@ -157,10 +157,73 @@ class PluginMipmapping(PluginBase):
         return melhor
     
     def processar(self, imagem: np.ndarray) -> np.ndarray:
-        return imagem.copy()
+        m = self.spin_m.value()
+        n = self.spin_n.value()
+        metodo = self.combo_metodo.currentIndex()
+
+        alt_orig, larg_orig = imagem.shape[:2]
+
+        nova_alt = max(1, alt_orig // m)
+        nova_larg = max(1, larg_orig // n)
+
+        # ==========================================================
+        # Método 0 - Subamostragem direta (sem mipmapping)
+        # ==========================================================
+        if metodo == 0:
+
+            sub_img = cv2.resize(
+                imagem,
+                (nova_larg, nova_alt),
+                interpolation=cv2.INTER_NEAREST,
+            )
+
+        # ==========================================================
+        # Método 1 - Pirâmide Gaussiana manual
+        # ==========================================================
+        elif metodo == 1:
+
+            piramide = self._gerar_piramide_manual(imagem)
+
+            sub_img = self._selecionar_nivel_mipmap(
+                piramide,
+                nova_larg,
+                nova_alt,
+            )
+        # ==========================================================
+        # Método 2 - Mipmapping usando OpenCV (cv2.pyrDown)
+        # ==========================================================
+        else:
+
+            piramide = self._gerar_piramide_cv2(imagem)
+
+            sub_img = self._selecionar_nivel_mipmap(
+                piramide,
+                nova_larg,
+                nova_alt,
+            )       
+        # ==========================================================
+        # Montagem da grade M × N utilizando a imagem reduzida
+        # ==========================================================
+        if imagem.ndim == 3:
+            grade = np.tile(sub_img, (m, n, 1))
+        else:
+            grade = np.tile(sub_img, (m, n))
+
+        return cv2.resize(
+            grade,
+            (larg_orig, alt_orig),
+            interpolation=cv2.INTER_LINEAR,
+        )
 
     def _ao_alterar_config(self):
-        pass
+        if hasattr(self, "imagem_original"):
+            self.preview_requested.emit(
+                self.processar(self.imagem_original)
+            )
 
     def _ao_aplicar(self):
-        self.accept()
+        if hasattr(self, "imagem_original"):
+            self.apply_requested.emit(
+                self.processar(self.imagem_original)
+            )
+            self.accept()
