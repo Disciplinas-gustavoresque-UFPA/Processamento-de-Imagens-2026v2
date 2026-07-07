@@ -53,6 +53,55 @@ class PluginMipmapping(PluginBase):
         layout.addWidget(self.btn_aplicar)
 
         self.setLayout(layout)
+    def _gerar_piramide_manual(self, imagem: np.ndarray) -> list[np.ndarray]:
+        """
+        Gera todos os níveis da pirâmide gaussiana usando
+        filtro binomial seguido de subamostragem.
+        """
+
+        kernel = np.array(
+            [
+                [1, 4, 6, 4, 1],
+                [4,16,24,16,4],
+                [6,24,36,24,6],
+                [4,16,24,16,4],
+                [1,4,6,4,1]
+            ],
+            dtype=np.float32
+        ) / 256.0
+
+        mipmaps = [imagem]
+
+        atual = imagem.astype(np.float32)
+
+        while atual.shape[0] > 1 and atual.shape[1] > 1:
+
+            if len(atual.shape) == 3:
+
+                filtrada = np.empty_like(atual)
+
+                for canal in range(atual.shape[2]):
+                    filtrada[:, :, canal] = cv2.filter2D(
+                        atual[:, :, canal],
+                        -1,
+                        kernel
+                    )
+
+            else:
+
+                filtrada = cv2.filter2D(
+                    atual,
+                    -1,
+                    kernel
+                )
+
+            atual = filtrada[::2, ::2]
+
+            mipmaps.append(
+                atual.astype(np.uint8)
+            )
+
+        return mipmaps
     def _gerar_piramide_cv2(self, imagem: np.ndarray) -> list[np.ndarray]:
         """
         Gera a pirâmide gaussiana utilizando a implementação
