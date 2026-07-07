@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-
-from PySide6.QtCore import QByteArray, Signal, Qt
+from PySide6.QtCore import QByteArray, Signal, Qt, QRect, QSize, QPoint
 from PySide6.QtGui import QCursor, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtWidgets import QLabel, QScrollArea, QSizePolicy
+from PySide6.QtWidgets import QLabel, QScrollArea, QSizePolicy, QRubberBand
+
+from core.mask_roi import criar_mascara_retangular
 
 
 class VisualizadorImagem(QScrollArea):
@@ -60,7 +61,15 @@ class VisualizadorImagem(QScrollArea):
         self._cursor_zoom_out = self._criar_cursor_zoom("zoom-out.svg")
         self._arrastando = False
         self._ultima_posicao_mouse = None
+        # ... código existente do __init__ ...
+        self._arrastando = False
+        self._ultima_posicao_mouse = None
 
+        # --- NOVAS VARIÁVEIS DA SELEÇÃO (ROI) ---
+        self.modo_selecao_ativa = False
+        self.rubberBand = QRubberBand(QRubberBand.Shape.Rectangle, self._label_imagem)
+        self.origem_selecao = QPoint()
+        self.mascara_atual = None
     def possui_imagem(self) -> bool:
         return self._pixmap_original is not None
 
@@ -158,6 +167,17 @@ class VisualizadorImagem(QScrollArea):
         super().wheelEvent(evento)
 
     def mousePressEvent(self, evento) -> None:
+        # 1. Se o modo seleção estiver ligado, intercepta o clique!
+        if self.modo_selecao_ativa and evento.button() == Qt.MouseButton.LeftButton:
+            # Pega a posição do clique em relação à imagem
+            pos_label = self._label_imagem.mapFrom(self.viewport(), evento.position().toPoint())
+            self.origem_selecao = pos_label
+            self.rubberBand.setGeometry(QRect(self.origem_selecao, QSize()))
+            self.rubberBand.show()
+            evento.accept()
+            return
+
+        # 2. Código original de arrasto e zoom
         if (
             (self._espaco_pressionado or self._ferramenta_mao_ativa)
             and self._pixmap_original is not None
@@ -190,8 +210,6 @@ class VisualizadorImagem(QScrollArea):
                     fator = 1 / self._FATOR_RODAS
 
             if fator is None:
-                # Consome o evento para garantir que o botão direito
-                # fique sem ação nesses modos.
                 evento.accept()
                 return
 
@@ -204,6 +222,14 @@ class VisualizadorImagem(QScrollArea):
         super().mousePressEvent(evento)
 
     def mouseMoveEvent(self, evento) -> None:
+        # 1. Se estiver desenhando a seleção, redimensiona o retângulo
+        if self.modo_selecao_ativa and not self.origem_selecao.isNull():
+            pos_label = self._label_imagem.mapFrom(self.viewport(), evento.position().toPoint())
+            self.rubberBand.setGeometry(QRect(self.origem_selecao, pos_label).normalized())
+            evento.accept()
+            return
+
+        # 2. Código original
         if self._arrastando and self._ultima_posicao_mouse is not None:
             delta = evento.position() - self._ultima_posicao_mouse
             self._ultima_posicao_mouse = evento.position()
@@ -220,6 +246,28 @@ class VisualizadorImagem(QScrollArea):
         super().mouseMoveEvent(evento)
 
     def mouseReleaseEvent(self, evento) -> None:
+        # 1. Finaliza a seleção e cria a máscara matemática
+        if self.modo_selecao_ativa and evento.button() == Qt.MouseButton.LeftButton:
+            rect = self.rubberBand.geometry()
+            self.origem_selecao = QPoint()
+
+            if rect.width() > 0 and rect.height() > 0 and self._pixmap_original is not None:
+                # O retângulo na tela leva o zoom em consideração, precisamos reverter o cálculo para os pixels originais
+                zoom = self._zoom
+                x_real, y_real = int(rect.x() / zoom), int(rect.y() / zoom)
+                w_real, h_real = int(rect.width() / zoom), int(rect.height() / zoom)
+                
+                shape_img = (self._pixmap_original.height(), self._pixmap_original.width(), 3)
+                self.mascara_atual = criar_mascara_retangular(shape_img, x_real, y_real, w_real, h_real)
+                print(f"Máscara Ativa: {w_real}x{h_real} pixels.")
+            else:
+                self.mascara_atual = None
+                self.rubberBand.hide()
+
+            evento.accept()
+            return
+
+        # 2. Código original
         if (
             self._modo_zoom_ferramenta is not None
             and evento.button() in (Qt.MouseButton.LeftButton, Qt.MouseButton.RightButton)
@@ -235,6 +283,7 @@ class VisualizadorImagem(QScrollArea):
             return
 
         super().mouseReleaseEvent(evento)
+
 
     def _definir_zoom_absoluto(self, zoom: float) -> None:
         novo_zoom = max(self._ZOOM_MINIMO, min(self._limite_zoom_superior(), zoom))
