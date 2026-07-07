@@ -53,7 +53,60 @@ class PluginMipmapping(PluginBase):
         layout.addWidget(self.btn_aplicar)
 
         self.setLayout(layout)
+    def _gerar_piramide_cv2(self, imagem: np.ndarray) -> list[np.ndarray]:
+        """
+        Gera a pirâmide gaussiana utilizando a implementação
+        nativa do OpenCV (cv2.pyrDown).
+        """
 
+        mipmaps = [imagem]
+
+        atual = imagem.copy()
+
+        while atual.shape[0] > 1 and atual.shape[1] > 1:
+            atual = cv2.pyrDown(atual)
+            mipmaps.append(atual)
+
+        return mipmaps
+    
+    def _selecionar_nivel_mipmap(
+        self,
+        piramide: list[np.ndarray],
+        largura_destino: int,
+        altura_destino: int,
+    ) -> np.ndarray:
+        """
+        Seleciona o nível da pirâmide cuja resolução é mais adequada
+        para a imagem de destino. Caso necessário, realiza um pequeno
+        ajuste de tamanho utilizando INTER_AREA.
+        """
+
+        melhor = piramide[0]
+
+        for nivel in piramide:
+
+            if (
+                nivel.shape[0] >= altura_destino
+                and
+                nivel.shape[1] >= largura_destino
+            ):
+                melhor = nivel
+            else:
+                break
+
+        if (
+            melhor.shape[0] != altura_destino
+            or
+            melhor.shape[1] != largura_destino
+        ):
+            melhor = cv2.resize(
+                melhor,
+                (largura_destino, altura_destino),
+                interpolation=cv2.INTER_AREA,
+            )
+
+        return melhor
+    
     def processar(self, imagem: np.ndarray) -> np.ndarray:
         return imagem.copy()
 
