@@ -12,6 +12,19 @@ from core.plugin_base import PluginBase
 
 
 class PluginMipmapping(PluginBase):
+    """
+    Plugin interativo para aplicação de Mipmapping (subamostragem) em imagens.
+
+    Esta ferramenta permite reduzir a resolução da imagem original e renderizá-la
+    em uma grade customizável de M linhas por N colunas, mantendo as proporções.
+
+    Abordagens implementadas:
+    1. Subamostragem Direta: Redução simples (Nearest Neighbor) sem filtro prévio.
+    2. Pirâmide Manual: Implementação matemática pura utilizando uma matriz de
+       filtro binomial 5x5 para suavização gaussiana, seguida de decimação.
+    3. OpenCV (pyrDown): Utilização da API nativa e otimizada de visão computacional
+       para a construção da pirâmide gaussiana.
+    """
     display_name = "Mipmapping"
 
     def setup_ui(self):
