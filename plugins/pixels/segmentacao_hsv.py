@@ -78,44 +78,76 @@ class SegmentacaoHSVPlugin(PluginBase):
         layout_botoes.addWidget(btn_cancelar)
         layout_botoes.addWidget(btn_aplicar)
         layout_principal.addLayout(layout_botoes)
-
+    def _gerar_imagem_segmentada(self):
+        """Gera a imagem segmentada a partir dos valores atuais dos sliders."""
+    
+        limite_inferior = np.array([
+            self.sliders["H Mínimo"].value(),
+            self.sliders["S Mínimo"].value(),
+            self.sliders["V Mínimo"].value()
+        ])
+    
+        limite_superior = np.array([
+            self.sliders["H Máximo"].value(),
+            self.sliders["S Máximo"].value(),
+            self.sliders["V Máximo"].value()
+        ])
+    
+        mascara = cv2.inRange(self.imagem_hsv, limite_inferior, limite_superior)
+    
+        return cv2.bitwise_and(
+            self.imagem_rgb_original,
+            self.imagem_rgb_original,
+            mask=mascara
+        )
+    
+    
     def _atualizar_segmentacao(self):
-        """Calcula a máscara HSV e envia o sinal de preview para a tela principal."""
-        # Recupera os valores atuais dos controles deslizantes
-        h_min = self.sliders["H Mínimo"].value()
-        h_max = self.sliders["H Máximo"].value()
-        s_min = self.sliders["S Mínimo"].value()
-        s_max = self.sliders["S Máximo"].value()
-        v_min = self.sliders["V Mínimo"].value()
-        v_max = self.sliders["V Máximo"].value()
-        
-        limite_inferior = np.array([h_min, s_min, v_min])
-        limite_superior = np.array([h_max, s_max, v_max])
-        
-        # Cria a máscara binária baseada nos intervalos selecionados
-        mascara = cv2.inRange(self.imagem_hsv, limite_inferior, limite_superior)
-        
-        # Aplica a máscara na imagem original para isolar os pixels selecionados
-        imagem_segmentada = cv2.bitwise_and(self.imagem_rgb_original, self.imagem_rgb_original, mask=mascara)
-        
-        # Emite o sinal de preview_requested exigido pela arquitetura do sistema
-        self.preview_requested.emit(imagem_segmentada)
-
+        """Calcula a segmentação e envia o preview para a tela principal."""
+        self.preview_requested.emit(self._gerar_imagem_segmentada())
+    
+    
     def accept(self):
-        """Disparado ao clicar em Aplicar, consolidando a alteração no histórico."""
-        h_min = self.sliders["H Mínimo"].value()
-        h_max = self.sliders["H Máximo"].value()
-        s_min = self.sliders["S Mínimo"].value()
-        s_max = self.sliders["S Máximo"].value()
-        v_min = self.sliders["V Mínimo"].value()
-        v_max = self.sliders["V Máximo"].value()
-        
-        limite_inferior = np.array([h_min, s_min, v_min])
-        limite_superior = np.array([h_max, s_max, v_max])
-        
-        mascara = cv2.inRange(self.imagem_hsv, limite_inferior, limite_superior)
-        imagem_final = cv2.bitwise_and(self.imagem_rgb_original, self.imagem_rgb_original, mask=mascara)
-        
-        # Emite o sinal de aplicação definitiva e encerra a janela de diálogo
-        self.apply_requested.emit(imagem_final)
+        """Aplica definitivamente a segmentação e fecha a janela."""
+        self.apply_requested.emit(self._gerar_imagem_segmentada())
         super().accept()
+    # def _atualizar_segmentacao(self):
+    #     """Calcula a máscara HSV e envia o sinal de preview para a tela principal."""
+    #     # Recupera os valores atuais dos controles deslizantes
+    #     h_min = self.sliders["H Mínimo"].value()
+    #     h_max = self.sliders["H Máximo"].value()
+    #     s_min = self.sliders["S Mínimo"].value()
+    #     s_max = self.sliders["S Máximo"].value()
+    #     v_min = self.sliders["V Mínimo"].value()
+    #     v_max = self.sliders["V Máximo"].value()
+        
+    #     limite_inferior = np.array([h_min, s_min, v_min])
+    #     limite_superior = np.array([h_max, s_max, v_max])
+        
+    #     # Cria a máscara binária baseada nos intervalos selecionados
+    #     mascara = cv2.inRange(self.imagem_hsv, limite_inferior, limite_superior)
+        
+    #     # Aplica a máscara na imagem original para isolar os pixels selecionados
+    #     imagem_segmentada = cv2.bitwise_and(self.imagem_rgb_original, self.imagem_rgb_original, mask=mascara)
+        
+    #     # Emite o sinal de preview_requested exigido pela arquitetura do sistema
+    #     self.preview_requested.emit(imagem_segmentada)
+
+    # def accept(self):
+    #     """Disparado ao clicar em Aplicar, consolidando a alteração no histórico."""
+    #     h_min = self.sliders["H Mínimo"].value()
+    #     h_max = self.sliders["H Máximo"].value()
+    #     s_min = self.sliders["S Mínimo"].value()
+    #     s_max = self.sliders["S Máximo"].value()
+    #     v_min = self.sliders["V Mínimo"].value()
+    #     v_max = self.sliders["V Máximo"].value()
+        
+    #     limite_inferior = np.array([h_min, s_min, v_min])
+    #     limite_superior = np.array([h_max, s_max, v_max])
+        
+    #     mascara = cv2.inRange(self.imagem_hsv, limite_inferior, limite_superior)
+    #     imagem_final = cv2.bitwise_and(self.imagem_rgb_original, self.imagem_rgb_original, mask=mascara)
+        
+    #     # Emite o sinal de aplicação definitiva e encerra a janela de diálogo
+    #     self.apply_requested.emit(imagem_final)
+    #     super().accept()
