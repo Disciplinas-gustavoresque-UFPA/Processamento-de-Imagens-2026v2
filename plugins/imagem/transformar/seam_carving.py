@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
 )
 from core.plugin_base import PluginBase
 
+
 class SeamCarvingWorker(QThread):
     """
     Worker Thread: Executa a matemática do Seam Carving em segundo plano.
@@ -147,4 +148,127 @@ class PluginSeamCarving(PluginBase):
     display_name = "Seam Carving"
 
     def setup_ui(self):
-        pass
+        layout = QVBoxLayout(self)
+
+        # 1. Painel de Informações do Sistema
+        grupo_info = QGroupBox("Status da Imagem")
+        info_layout = QVBoxLayout()
+        self.lbl_info = QLabel("Carregando informações da imagem...")
+        self.lbl_info.setWordWrap(True)
+        info_layout.addWidget(self.lbl_info)
+        grupo_info.setLayout(info_layout)
+        layout.addWidget(grupo_info)
+
+        # 2. Painel de Configurações Interativas (Sliders)
+        grupo_config = QGroupBox("Redimensionamento Sensível ao Conteúdo")
+        config_layout = QVBoxLayout()
+        
+        lbl_explicacao = QLabel(
+            "<i>Deslize para definir a porcentagem de redução desejada. "
+            "O Seam Carving encolherá a imagem removendo as áreas com menos detalhes.</i>"
+        )
+        lbl_explicacao.setWordWrap(True)
+        config_layout.addWidget(lbl_explicacao)
+
+        # --- Controles de Largura ---
+        lay_largura_textos = QHBoxLayout()
+        lay_largura_textos.addWidget(QLabel("<b>Reduzir Largura:</b>"))
+        self.lbl_largura_val = QLabel("0% (-- px)") 
+        self.lbl_largura_val.setAlignment(Qt.AlignmentFlag.AlignRight)
+        lay_largura_textos.addWidget(self.lbl_largura_val)
+        
+        self.slider_largura = QSlider(Qt.Orientation.Horizontal)
+        self.slider_largura.setRange(0, 50) 
+        self.slider_largura.setValue(0)
+        self.slider_largura.valueChanged.connect(self._atualizar_textos_dinamicos)
+
+        config_layout.addLayout(lay_largura_textos)
+        config_layout.addWidget(self.slider_largura)
+
+        # --- Controles de Altura ---
+        lay_altura_textos = QHBoxLayout()
+        lay_altura_textos.addWidget(QLabel("<b>Reduzir Altura:</b>"))
+        self.lbl_altura_val = QLabel("0% (-- px)") 
+        self.lbl_altura_val.setAlignment(Qt.AlignmentFlag.AlignRight)
+        lay_altura_textos.addWidget(self.lbl_altura_val)
+        
+        self.slider_altura = QSlider(Qt.Orientation.Horizontal)
+        self.slider_altura.setRange(0, 50) 
+        self.slider_altura.setValue(0)
+        self.slider_altura.valueChanged.connect(self._atualizar_textos_dinamicos)
+
+        config_layout.addLayout(lay_altura_textos)
+        config_layout.addWidget(self.slider_altura)
+
+        grupo_config.setLayout(config_layout)
+        layout.addWidget(grupo_config)
+
+        # 3. Botão de Ação
+        self.btn_aplicar = QPushButton("Aplicar no Editor")
+        self.btn_aplicar.clicked.connect(self._ao_aplicar)
+        layout.addWidget(self.btn_aplicar)
+
+        self.setLayout(layout)
+        self.worker = None 
+        
+        self.largura_base = 0
+        self.altura_base = 0
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if hasattr(self, "imagem_original"):
+            self.altura_base, self.largura_base = self.imagem_original.shape[:2]
+            self.lbl_info.setText(
+                f"<b>Resolução Original:</b> {self.largura_base} px (L) x {self.altura_base} px (A)"
+            )
+            self.slider_largura.setValue(0)
+            self.slider_altura.setValue(0)
+            self._atualizar_textos_dinamicos()
+
+    def _calcular_alvos(self):
+        pct_largura = self.slider_largura.value()
+        pct_altura = self.slider_altura.value()
+        
+        largura_alvo = int(self.largura_base * (1 - (pct_largura / 100.0)))
+        altura_alvo = int(self.altura_base * (1 - (pct_altura / 100.0)))
+        
+        return largura_alvo, altura_alvo
+
+    def _atualizar_textos_dinamicos(self):
+        if self.largura_base == 0:
+            return
+
+        largura_alvo, altura_alvo = self._calcular_alvos()
+        pct_largura = self.slider_largura.value()
+        pct_altura = self.slider_altura.value()
+
+        self.lbl_largura_val.setText(f"-{pct_largura}% (Restará {largura_alvo} px)")
+        self.lbl_altura_val.setText(f"-{pct_altura}% (Restará {altura_alvo} px)")
+
+    def _atualizar_progresso(self, porcentagem: int):
+        self.btn_aplicar.setText(f"Processando matriz... {porcentagem}%")
+
+    def _ao_concluir(self, img_processada: np.ndarray):
+        self.apply_requested.emit(img_processada)
+        self.accept()
+
+    def _ao_aplicar(self):
+        if hasattr(self, "imagem_original"):
+            pct_largura = self.slider_largura.value()
+            pct_altura = self.slider_altura.value()
+            
+            if pct_largura == 0 and pct_altura == 0:
+                self.reject()
+                return
+
+            largura_alvo, altura_alvo = self._calcular_alvos()
+
+            self.btn_aplicar.setEnabled(False)
+            self.slider_largura.setEnabled(False)
+            self.slider_altura.setEnabled(False)
+
+            self.worker = SeamCarvingWorker(self.imagem_original, largura_alvo, altura_alvo)
+            self.worker.progresso.connect(self._atualizar_progresso)
+            self.worker.concluido.connect(self._ao_concluir)
+            
+            self.worker.start()
