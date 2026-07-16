@@ -47,6 +47,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from core.memento import Historico
+from core.mask_roi import aplicar_filtro_com_mascara
 
 # Garante que o diretório raiz do projeto esteja no sys.path para que os
 # plugins possam importar ``core.plugin_base`` sem ajustes manuais.
@@ -93,7 +94,6 @@ def _instalar_filtro_mensagens_qt() -> None:
     _HANDLER_MENSAGENS_QT = handler
     _HANDLER_MENSAGENS_QT_ANTERIOR = qInstallMessageHandler(_HANDLER_MENSAGENS_QT)
 from camera.gerenciar_camera import DialogoCamera
-
 
 # ---------------------------------------------------------------------------
 # Widget de arrastar e soltar (drag-and-drop)
@@ -202,7 +202,6 @@ def _formatar_nome_menu(nome_pasta: str) -> str:
     return nome_pasta.capitalize()
 
 
-
 def carregar_plugins_dinamicamente(
     menu_pai: QMenu,
     diretorio: str,
@@ -234,8 +233,13 @@ def carregar_plugins_dinamicamente(
         caminho = os.path.join(diretorio, entrada)
         if os.path.isdir(caminho) and not entrada.startswith("_"):
             submenu = QMenu(_formatar_nome_menu(entrada), menu_pai)
-            menu_pai.addMenu(submenu)
+            
+            # Executa a recursão primeiro para tentar popular o submenu
             carregar_plugins_dinamicamente(submenu, caminho, janela_principal)
+            
+            # Adiciona ao menu pai APENAS se alguma ação (ou submenu com ações) foi inserida
+            if not submenu.isEmpty():
+                menu_pai.addMenu(submenu)
 
     # --- Depois pelos arquivos .py (criam QActions) ---
     for entrada in entradas:
@@ -256,7 +260,6 @@ def carregar_plugins_dinamicamente(
                     lambda _checked=False, cls=classe_plugin: janela_principal.abrir_plugin(cls)
                 )
 
-    
 # ---------------------------------------------------------------------------
 # Classes de Estado
 # ---------------------------------------------------------------------------
@@ -268,8 +271,6 @@ class DocumentoImagem(QWidget):
     """
     # Cria um sinal para repassar a alteração de zoom para a janela principal
     zoom_alterado = Signal(float)
-
-    
 
     def __init__(self, caminho_arquivo: str, imagem_bgr: np.ndarray, parent=None):
         super().__init__(parent)
@@ -702,6 +703,13 @@ class JanelaPrincipal(QMainWindow):
         acao_zoom_100.setShortcut("Ctrl+0")
         acao_zoom_100.triggered.connect(self._delegar_resetar_zoom)
 
+        # --- NOVO: Botão para ligar a Seleção ---
+        menu_visualizar.addSeparator()
+        acao_selecao = menu_visualizar.addAction("Ferramenta de Seleção (ROI)")
+        acao_selecao.setShortcut("S") # Aperte S para ativar
+        acao_selecao.setCheckable(True)
+        acao_selecao.triggered.connect(self._alternar_modo_selecao)
+
         # --- Menus de plugins (populados dinamicamente) ---
         # --- Menu Imagem (transformações e ajustes globais) ---
         menu_imagem = barra.addMenu("Imagem")
@@ -730,23 +738,16 @@ class JanelaPrincipal(QMainWindow):
             aviso = menu_filtros.addAction("(nenhum plugin encontrado)")
             aviso.setEnabled(False)
 
-        # --- Menu Detecção ---
+        # --- Menu Detecção (pontos e características da imagem) ---
         menu_deteccao = barra.addMenu("Detecção")
         diretorio_deteccao = os.path.join(
-            _DIRETORIO_RAIZ,
-            "plugins",
-            "deteccao",
+            _DIRETORIO_RAIZ, "plugins", "deteccao"
         )
-
-        carregar_plugins_dinamicamente(
-            menu_deteccao,
-            diretorio_deteccao,
-            self,
-        )
+        carregar_plugins_dinamicamente(menu_deteccao, diretorio_deteccao, self)
 
         if not _menu_tem_acao_folha(menu_deteccao):
             aviso = menu_deteccao.addAction("(nenhum plugin encontrado)")
-            aviso.setEnabled(False)    
+            aviso.setEnabled(False)
 
         # --- Menu Reconhecimento (leitura e identificação de padrões) ---
         menu_reconhecimento = barra.addMenu("Reconhecimento")
@@ -831,6 +832,8 @@ class JanelaPrincipal(QMainWindow):
 
         if mensagem_status:
             self.statusBar().showMessage(mensagem_status)
+
+        self._sidebar_direita.atualizar_compressao(imagem_bgr)
 
         return novo_documento
 
@@ -1176,37 +1179,40 @@ class JanelaPrincipal(QMainWindow):
     def _ao_receber_preview(self, imagem_rgb: np.ndarray, aba: DocumentoImagem) -> None:
         """Exibe a pré-visualização sem alterar a imagem de trabalho."""
         imagem_bgr = cv2.cvtColor(imagem_rgb, cv2.COLOR_RGB2BGR)
+        
+        # --- MESCLA A MÁSCARA NO PREVIEW ---
+        mascara = aba.visualizador.mascara_atual
+        if mascara is not None and aba.imagem_backup is not None:
+            imagem_bgr = aplicar_filtro_com_mascara(aba.imagem_backup, imagem_bgr, mascara)
+            
         aba.atualizar_visualizacao(imagem_bgr)
 
-
     def _ao_aplicar_plugin(self, imagem_rgb: np.ndarray, aba: DocumentoImagem) -> None:
-        """
-        Substitui a imagem da aba pela imagem processada,
-        salvando o estado anterior no histórico.
-        """
-        # Salva estado atual antes da alteração
+        """Substitui a imagem da aba pela imagem processada."""
         if aba.imagem_atual is not None:
             aba.historico.salvar(aba.imagem_atual.copy())
 
         imagem_bgr = cv2.cvtColor(imagem_rgb, cv2.COLOR_RGB2BGR)
 
+        # --- MESCLA A MÁSCARA NO FILTRO FINAL ---
+        mascara = aba.visualizador.mascara_atual
+        if mascara is not None and aba.imagem_backup is not None:
+            imagem_bgr = aplicar_filtro_com_mascara(aba.imagem_backup, imagem_bgr, mascara)
+
         aba.imagem_atual = imagem_bgr
         aba.imagem_backup = None
 
-        # Atualiza visualização
         aba.atualizar_visualizacao(imagem_bgr)
 
-        # Atualiza miniatura da aba
         indice_aba = self.tabs.indexOf(aba)
         if indice_aba != -1:
-            self.tabs.setTabIcon(
-                indice_aba,
-                self._gerar_icone_miniatura(imagem_bgr)
-            )
+            self.tabs.setTabIcon(indice_aba, self._gerar_icone_miniatura(imagem_bgr))
 
         self._marcar_como_modificado(aba, True)
+        self.statusBar().showMessage("Filtro aplicado com sucesso na região selecionada.")
 
-        self.statusBar().showMessage("Filtro aplicado com sucesso.")
+        if self.tabs.currentWidget() == aba:
+            self._sidebar_direita.atualizar_compressao(imagem_bgr)
 
     def _ao_aplicar_multiplas_imagens(self, imagens_rgb, aba_atual):
         """Cria novas abas a partir de múltiplas imagens RGB geradas por um plugin."""
@@ -1259,6 +1265,8 @@ class JanelaPrincipal(QMainWindow):
             )
 
         self.statusBar().showMessage("Desfazer realizado.")
+
+        self._sidebar_direita.atualizar_compressao(estado)
 
     def _restaurar_backup(self) -> None:
         """Restaura a imagem da aba atual ao estado anterior."""
@@ -1381,6 +1389,7 @@ class JanelaPrincipal(QMainWindow):
         if indice == -1: # Nenhuma aba aberta (fechou tudo)
             self._imagem_atual = None
             self._ao_zoom_alterado(1.0)
+            self._sidebar_direita.atualizar_compressao(None)
             return
 
         aba_atual = self.tabs.widget(indice)
@@ -1391,11 +1400,13 @@ class JanelaPrincipal(QMainWindow):
             self._ao_zoom_alterado(zoom_atual)
             if self._ferramenta_ativa_toolbar in {"mover", "zoom"}:
                 self._ao_ferramenta_alterada(self._ferramenta_ativa_toolbar)
+            self._sidebar_direita.atualizar_compressao(aba_atual.imagem_atual)
             return
 
         self._imagem_atual = None
         self._atualizar_visibilidade_laterais(False)
         self._ao_zoom_alterado(1.0)
+        self._sidebar_direita.atualizar_compressao(None)
 
     def keyPressEvent(self, evento) -> None:
         """Atalhos globais."""
@@ -1491,6 +1502,15 @@ class JanelaPrincipal(QMainWindow):
         aba = self.tabs.currentWidget()
         if aba and hasattr(aba, 'resetar_zoom'):
             aba.resetar_zoom()
+
+    def _alternar_modo_selecao(self, ativo: bool):
+        aba_atual = self.tabs.currentWidget()
+        if isinstance(aba_atual, DocumentoImagem):
+            aba_atual.visualizador.modo_selecao_ativa = ativo
+            if not ativo and aba_atual.visualizador.rubberBand:
+                aba_atual.visualizador.rubberBand.hide()
+                aba_atual.visualizador.mascara_atual = None
+            self.statusBar().showMessage(f"Modo Seleção (ROI): {'Ligado' if ativo else 'Desligado'}")
 
 # ---------------------------------------------------------------------------
 # Ponto de entrada
