@@ -855,9 +855,50 @@ class JanelaPrincipal(QMainWindow):
             )
             return
 
-        imagem_bgr = cv2.imread(caminho)
-        if imagem_bgr is None:
-            QMessageBox.critical(self, "Erro", f"Não foi possível abrir:\n{caminho}")
+        # Valida se o caminho existe e corresponde a um arquivo físico
+        if not os.path.isfile(caminho):
+            QMessageBox.critical(
+                self, 
+                "Erro de Leitura", 
+                f"O arquivo não existe ou o caminho é inválido:\n{caminho}"
+            )
+            return
+
+        # Lê o arquivo de forma segura tratando exceções de I/O
+        try:
+            buffer = np.fromfile(caminho, dtype=np.uint8)
+        except Exception as erro:
+            QMessageBox.critical(
+                self, 
+                "Erro de Leitura", 
+                f"Não foi possível ler o arquivo físico:\n{caminho}\n\nDetalhes: {erro}"
+            )
+            return
+
+        # Verifica se o buffer lido está vazio antes de decodificar
+        if buffer is None or buffer.size == 0:
+            QMessageBox.critical(
+                self, 
+                "Arquivo Corrompido", 
+                f"O arquivo selecionado está vazio ou corrompido:\n{caminho}"
+            )
+            return
+
+        # Decodifica a imagem tratando exceções do OpenCV
+        try:
+            # Lê o arquivo usando numpy e decodifica com OpenCV
+            imagem_bgr = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
+            if imagem_bgr is None:
+                raise ValueError(
+                    "A decodificação de imagem falhou. O formato pode não ser suportado "
+                    "ou o cabeçalho do arquivo está corrompido."
+                )
+        except Exception as erro:
+            QMessageBox.critical(
+                self, 
+                "Erro de Decodificação", 
+                f"Não foi possível decodificar os dados da imagem:\n{caminho}\n\nDetalhes: {erro}"
+            )
             return
 
         # Extrai apenas o nome do arquivo para exibir na aba
@@ -1043,8 +1084,15 @@ class JanelaPrincipal(QMainWindow):
             return
 
         try:
-            sucesso = cv2.imwrite(caminho_normalizado, aba_atual.imagem_atual)
-        except cv2.error as erro:
+            # Extrai a extensão para informar ao encoder (ex: '.png')
+            _, extensao = os.path.splitext(caminho_normalizado)
+            
+            # Codifica a imagem na memória e depois salva no disco com numpy
+            sucesso, buffer_imagem = cv2.imencode(extensao, aba_atual.imagem_atual)
+            if sucesso:
+                buffer_imagem.tofile(caminho_normalizado)
+                
+        except Exception as erro:
             QMessageBox.critical(
                 self,
                 "Erro",
