@@ -1,9 +1,6 @@
 '''
-Plugin para quantização uniforme de cores por canal.
-O filtro reduz cada canal da imagem para uma quantidade definida de níveis:
-2, 4, 8, 16 ou 32 níveis por canal.
-Cada intensidade é mapeada para
-o nível uniforme mais próximo e depois reconstruída no intervalo [0, 255]
+Plugin para quantização uniforme de cores por canal. O filtro reduz cada canal da imagem para uma quantidade definida de níveis: 
+2, 4, 8, 16 ou 32 níveis por canal. Cada intensidade é mapeada para o nível uniforme mais próximo e depois reconstruída no intervalo [0, 255]
 '''
 
 import numpy as np
@@ -17,17 +14,13 @@ from PySide6.QtWidgets import (
 )
 
 from core.plugin_base import PluginBase
-
-
 class FiltroQuantizacaoCores(PluginBase):
-    """Reduz uniformemente a quantidade de níveis de cada canal da imagem."""
 
     display_name = "Quantização de Cores"
 
     _NIVEIS_DISPONIVEIS = (2, 4, 8, 16, 32)
 
     def setup_ui(self) -> None:
-        """Cria os controles de seleção de níveis e os botões do diálogo."""
         layout_principal = QVBoxLayout(self)
 
         titulo = QLabel("Quantidade de níveis por canal", self)
@@ -42,8 +35,6 @@ class FiltroQuantizacaoCores(PluginBase):
                 niveis,
             )
 
-        # Oito níveis produz um resultado visível sem destruir demasiadamente
-        # os detalhes da imagem.
         indice_padrao = self._combo_niveis.findData(8)
         self._combo_niveis.setCurrentIndex(indice_padrao)
 
@@ -82,7 +73,6 @@ class FiltroQuantizacaoCores(PluginBase):
         self._atualizar_rotulos()
 
     def _obter_niveis(self) -> int:
-        """Retorna a quantidade de níveis atualmente selecionada."""
         niveis = self._combo_niveis.currentData()
 
         if niveis not in self._NIVEIS_DISPONIVEIS:
@@ -91,7 +81,6 @@ class FiltroQuantizacaoCores(PluginBase):
         return int(niveis)
 
     def _atualizar_rotulos(self) -> None:
-        """Atualiza a informação sobre o limite teórico de cores."""
         niveis = self._obter_niveis()
         total_cores = niveis ** 3
 
@@ -100,19 +89,7 @@ class FiltroQuantizacaoCores(PluginBase):
         )
 
     def processar(self, imagem: np.ndarray) -> np.ndarray:
-        """
-        Aplica quantização uniforme independentemente em cada canal.
 
-        Para L níveis, o índice quantizado é calculado por:
-
-            q = round(pixel * (L - 1) / 255)
-
-        Depois, o nível é reconstruído no intervalo de 8 bits:
-
-            resultado = round(q * 255 / (L - 1))
-
-        Essa abordagem não utiliza máscara binária nem planos de bits.
-        """
         if imagem is None or imagem.size == 0:
             return imagem.copy()
 
@@ -131,14 +108,12 @@ class FiltroQuantizacaoCores(PluginBase):
         return np.clip(resultado, 0, 255).astype(np.uint8)
 
     def _ao_mudar_niveis(self, _indice: int) -> None:
-        """Atualiza a interface e emite uma pré-visualização."""
         self._atualizar_rotulos()
 
         imagem_processada = self.processar(self.imagem_original)
         self.preview_requested.emit(imagem_processada)
 
     def _ao_aplicar(self) -> None:
-        """Aplica o resultado e fecha o diálogo."""
         imagem_processada = self.processar(self.imagem_original)
         self.apply_requested.emit(imagem_processada)
         self.accept()

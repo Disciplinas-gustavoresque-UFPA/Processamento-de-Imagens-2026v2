@@ -96,3 +96,57 @@ QToolButton#layerControlButton {
 QToolButton#layerControlButton:hover {
     background-color: #3c3c3c;
 }
+
+QFrame#rightDivisor {
+    color: #333333;
+    max-height: 1px;
+    margin-top: 12px;
+    margin-bottom: 12px;
+}
+
+QFrame#compressionStatsFrame {
+    background-color: #252525;
+    border: 1px solid #333333;
+    border-radius: 6px;
+    padding: 2px;
+}
+
+QLabel#compLabel {
+    color: #9ca3af;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+QLabel#compVal {
+    color: #f3f4f6;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+QLabel#compPct {
+    color: #10b981;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+QPushButton#huffExportButton {
+    background-color: #2a2a2a;
+    color: #d1d5db;
+    border: 1px solid #3c3c3c;
+    border-radius: 4px;
+    padding: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+QPushButton#huffExportButton:hover {
+    background-color: #3c3c3c;
+    color: #ffffff;
+}
+
+QPushButton#huffExportButton:disabled {
+    background-color: #1a1a1a;
+    color: #555555;
+    border: 1px solid #252525;
+}
