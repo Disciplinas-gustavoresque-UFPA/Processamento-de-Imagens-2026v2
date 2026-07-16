@@ -170,3 +170,110 @@ class OperacoesAritmeticas(PluginBase):
 
         self.setLayout(layout_principal)
         self.setMinimumWidth(380)
+
+
+    def _selecionar_imagem(self) -> None:
+        """
+        Objetivo:
+            Permitir ao usuário selecionar uma segunda imagem para ser
+            utilizada na operação aritmética.
+
+        Especificidades:
+            Abre um diálogo para seleção de arquivos de imagem.
+            Caso uma imagem válida seja escolhida, ela é carregada
+            utilizando o OpenCV, armazenada internamente e o nome do
+            arquivo é exibido na interface.
+
+            Após o carregamento, uma nova pré-visualização é gerada.
+
+        Parâmetros:
+            Nenhum.
+
+        Retorno:
+            None.
+        """
+
+        arquivo, _ = QFileDialog.getOpenFileName(
+            self,
+            "Selecionar imagem",
+            "",
+            "Imagens (*.png *.jpg *.jpeg *.bmp)",
+        )
+
+        if not arquivo:
+            return
+
+        imagem = cv2.imread(arquivo)
+
+        if imagem is None:
+            return
+
+        # Converter para RGB caso o restante da aplicação utilize esse formato.
+        imagem = cv2.cvtColor(imagem, cv2.COLOR_BGR2RGB)
+
+        self._segunda_imagem = imagem
+
+        self._label_imagem.setText(Path(arquivo).name)
+
+        self._emitir_preview()
+
+    def processar(self, imagem: np.ndarray) -> np.ndarray:
+        """
+        Objetivo:
+            Combinar a imagem atualmente carregada com uma segunda
+            imagem utilizando a função cv2.addWeighted().
+
+        Especificidades:
+            Caso nenhuma segunda imagem tenha sido selecionada,
+            retorna uma cópia da imagem original.
+
+            A segunda imagem é redimensionada automaticamente para
+            possuir as mesmas dimensões da imagem principal, caso
+            necessário.
+
+            A operação realizada é:
+
+                dst = src1 * alpha + src2 * beta + gamma
+
+            onde:
+
+                src1  -> imagem original;
+                src2  -> segunda imagem;
+                alpha -> peso aplicado à imagem original;
+                beta  -> peso aplicado à segunda imagem;
+                gamma -> deslocamento aplicado ao resultado.
+
+            O OpenCV realiza automaticamente a saturação dos valores,
+            limitando-os ao intervalo permitido para imagens de
+            8 bits (0 a 255).
+
+        Parâmetros:
+            imagem (np.ndarray):
+                Imagem atualmente carregada na aplicação.
+
+        Retorno:
+            np.ndarray:
+                Imagem resultante da combinação entre as duas imagens.
+        """
+
+        if self._segunda_imagem is None:
+            return imagem.copy()
+
+        segunda = cv2.resize(
+            self._segunda_imagem,
+            (imagem.shape[1], imagem.shape[0]),
+        )
+
+        alpha = self._slider_alpha.value() / 100.0
+        beta = self._slider_beta.value() / 100.0
+        gamma = self._slider_gamma.value()
+
+        resultado = cv2.addWeighted(
+            imagem,
+            alpha,
+            segunda,
+            beta,
+            gamma,
+        )
+
+        return resultado
