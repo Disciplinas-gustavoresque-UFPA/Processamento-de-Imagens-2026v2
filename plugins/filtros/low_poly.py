@@ -176,4 +176,108 @@ class PluginLowPoly(PluginBase):
     display_name = "Efeito Low Poly"
 
     def setup_ui(self):
-        pass
+        layout = QVBoxLayout(self)
+
+        grupo_config = QGroupBox("Ajuste da Malha")
+        config_layout = QVBoxLayout()
+        
+        lbl_explicacao = QLabel(
+            "<i>O Low Poly estiliza a foto convertendo-a em uma malha de triângulos "
+            "coloridos (mosaico geométrico). Deslize e solte o controle para aplicar. "
+            "Menos pontos geram um efeito mais abstrato, enquanto mais pontos "
+            "preservam os detalhes originais.</i>"
+        )
+        lbl_explicacao.setWordWrap(True)
+        config_layout.addWidget(lbl_explicacao)
+
+        lay_pontos_textos = QHBoxLayout()
+        lay_pontos_textos.addWidget(QLabel("<b>Complexidade:</b>"))
+        self.lbl_pontos_val = QLabel(f"{PONTOS_PADRAO} pontos") 
+        self.lbl_pontos_val.setAlignment(Qt.AlignmentFlag.AlignRight)
+        lay_pontos_textos.addWidget(self.lbl_pontos_val)
+        
+        self.slider_pontos = QSlider(Qt.Orientation.Horizontal)
+        self.slider_pontos.setRange(PONTOS_MIN, PONTOS_MAX) 
+        self.slider_pontos.setValue(PONTOS_PADRAO)
+        self.slider_pontos.setSingleStep(SLIDER_PASSO_UNICO) 
+        self.slider_pontos.setPageStep(SLIDER_PASSO_PAGINA) 
+        
+        self.slider_pontos.valueChanged.connect(self._ao_mexer_slider)
+        self.slider_pontos.sliderReleased.connect(self._iniciar_renderizacao)
+
+        config_layout.addLayout(lay_pontos_textos)
+        config_layout.addWidget(self.slider_pontos)
+        grupo_config.setLayout(config_layout)
+        layout.addWidget(grupo_config)
+
+        self.btn_aplicar = QPushButton("Aplicar Filtro")
+        self.btn_aplicar.clicked.connect(self.accept)
+        layout.addWidget(self.btn_aplicar)
+
+        self.setLayout(layout)
+        
+        self.worker: Optional[LowPolyWorker] = None 
+
+        self.timer_debounce = QTimer(self)
+        self.timer_debounce.setSingleShot(True)
+        self.timer_debounce.setInterval(500) 
+        self.timer_debounce.timeout.connect(self._iniciar_renderizacao)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.lbl_pontos_val.setText(f"{self.slider_pontos.value()} pontos")
+        self.btn_aplicar.setText("Aplicar Filtro")
+        self.btn_aplicar.setEnabled(True)
+
+    def _ao_mexer_slider(self):
+        self.lbl_pontos_val.setText(f"{self.slider_pontos.value()} pontos")
+        self.btn_aplicar.setEnabled(False)
+        
+        if self.slider_pontos.isSliderDown():
+            self.btn_aplicar.setText("Solte para atualizar...")
+        else:
+            self.btn_aplicar.setText("Aguardando ajuste...")
+            self.timer_debounce.start()
+
+    def _limpar_worker(self):
+        """Centraliza o encerramento e a liberação de memória da Thread."""
+        if self.worker is not None:
+            if self.worker.isRunning():
+                self.worker.abortar()
+                self.worker.wait()
+            self.worker.deleteLater()
+            self.worker = None
+
+    def _iniciar_renderizacao(self):
+        if not hasattr(self, "imagem_original"): 
+            return
+
+        self.timer_debounce.stop() 
+        self._limpar_worker()
+
+        self.btn_aplicar.setEnabled(False)
+        self.btn_aplicar.setText("Calculando Malha... 0%")
+        
+        self.worker = LowPolyWorker(self.imagem_original, self.slider_pontos.value())
+        self.worker.progresso.connect(self._atualizar_progresso)
+        self.worker.concluido.connect(self._ao_concluir_worker)
+        self.worker.start()
+
+    def _atualizar_progresso(self, porcentagem: int):
+        self.btn_aplicar.setText(f"Calculando Malha... {porcentagem}%")
+
+    def _ao_concluir_worker(self, imagem_processada: np.ndarray):
+        self.btn_aplicar.setText("Aplicar Filtro")
+        self.btn_aplicar.setEnabled(True)
+        self.apply_requested.emit(imagem_processada)
+        self._limpar_worker()
+
+    def reject(self):
+        self._limpar_worker()
+        if hasattr(self, "imagem_original"):
+            self.apply_requested.emit(self.imagem_original)
+        super().reject()
+
+    def accept(self):
+        self._limpar_worker()
+        super().accept()
