@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
-from PySide6.QtCore import QByteArray, Signal, Qt
+from PySide6.QtCore import QByteArray, QPoint, QRect, Signal, Qt
 from PySide6.QtGui import QCursor, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtWidgets import QLabel, QScrollArea, QSizePolicy
+from PySide6.QtWidgets import QLabel, QScrollArea, QRubberBand, QSizePolicy
 
 
 class VisualizadorImagem(QScrollArea):
     """Widget responsável por exibir imagem com zoom e arrasto."""
 
     zoom_alterado = Signal(float)
+    selecao_alterada = Signal(object)
 
     _ZOOM_MINIMO = 0.10
     _ZOOM_MAXIMO = 8.00
@@ -49,17 +51,23 @@ class VisualizadorImagem(QScrollArea):
             except (OSError, UnicodeError) as erro:
                 print(f"Falha ao carregar o arquivo de estilo '{caminho_qss}': {erro}")
 
-        self._pixmap_original: QPixmap | None = None
+        self._pixmap_original: Optional[QPixmap] = None
         self._zoom = 1.0
         self._espaco_pressionado = False
         self._ferramenta_mao_ativa = False
-        self._modo_zoom_ferramenta: str | None = None
-        self._botao_zoom_pressionado: Qt.MouseButton | None = None
+        self._modo_zoom_ferramenta: Optional[str] = None
+        self._modo_selecao_ativo = False
+        self._botao_zoom_pressionado: Optional[Qt.MouseButton] = None
         self._cursor_zoom = self._criar_cursor_zoom("zoom.svg")
         self._cursor_zoom_in = self._criar_cursor_zoom("zoom-in.svg")
         self._cursor_zoom_out = self._criar_cursor_zoom("zoom-out.svg")
         self._arrastando = False
         self._ultima_posicao_mouse = None
+        self._ponto_inicial_selecao_viewport: Optional[QPoint] = None
+        self._selecao_retangular: Optional[QRect] = None
+        self._rubber_band = QRubberBand(QRubberBand.Shape.Rectangle, self.viewport())
+        self.horizontalScrollBar().valueChanged.connect(self._atualizar_rubber_band)
+        self.verticalScrollBar().valueChanged.connect(self._atualizar_rubber_band)
 
     def possui_imagem(self) -> bool:
         return self._pixmap_original is not None
@@ -117,6 +125,21 @@ class VisualizadorImagem(QScrollArea):
             return
         self._definir_zoom_absoluto(1.0)
 
+    def definir_modo_selecao(self, ativo: bool) -> None:
+        self._modo_selecao_ativo = ativo
+        if not ativo:
+            self._ponto_inicial_selecao_viewport = None
+        self._atualizar_cursor()
+
+    def limpar_selecao(self) -> None:
+        self._selecao_retangular = None
+        self._ponto_inicial_selecao_viewport = None
+        self._rubber_band.hide()
+        self.selecao_alterada.emit(None)
+
+    def obter_selecao_retangular(self) -> Optional[QRect]:
+        return self._selecao_retangular
+
     def aumentar_zoom(self) -> None:
         centro = self.viewport().rect().center()
         self._aplicar_fator_zoom(self._FATOR_RODAS, centro)
@@ -158,6 +181,17 @@ class VisualizadorImagem(QScrollArea):
         super().wheelEvent(evento)
 
     def mousePressEvent(self, evento) -> None:
+        if (
+            self._modo_selecao_ativo
+            and self._pixmap_original is not None
+            and evento.button() == Qt.MouseButton.LeftButton
+        ):
+            self._ponto_inicial_selecao_viewport = evento.position().toPoint()
+            self._rubber_band.setGeometry(QRect(self._ponto_inicial_selecao_viewport, self._ponto_inicial_selecao_viewport))
+            self._rubber_band.show()
+            evento.accept()
+            return
+
         if (
             (self._espaco_pressionado or self._ferramenta_mao_ativa)
             and self._pixmap_original is not None
@@ -204,6 +238,14 @@ class VisualizadorImagem(QScrollArea):
         super().mousePressEvent(evento)
 
     def mouseMoveEvent(self, evento) -> None:
+        if self._modo_selecao_ativo and self._ponto_inicial_selecao_viewport is not None:
+            objetivo = evento.position().toPoint()
+            self._rubber_band.setGeometry(
+                QRect(self._ponto_inicial_selecao_viewport, objetivo).normalized()
+            )
+            evento.accept()
+            return
+
         if self._arrastando and self._ultima_posicao_mouse is not None:
             delta = evento.position() - self._ultima_posicao_mouse
             self._ultima_posicao_mouse = evento.position()
@@ -220,6 +262,15 @@ class VisualizadorImagem(QScrollArea):
         super().mouseMoveEvent(evento)
 
     def mouseReleaseEvent(self, evento) -> None:
+        if (
+            self._modo_selecao_ativo
+            and self._ponto_inicial_selecao_viewport is not None
+            and evento.button() == Qt.MouseButton.LeftButton
+        ):
+            self._finalizar_selecao(evento.position().toPoint())
+            evento.accept()
+            return
+
         if (
             self._modo_zoom_ferramenta is not None
             and evento.button() in (Qt.MouseButton.LeftButton, Qt.MouseButton.RightButton)
@@ -280,6 +331,69 @@ class VisualizadorImagem(QScrollArea):
         largura = max(1, int(self._pixmap_original.width() * self._zoom))
         altura = max(1, int(self._pixmap_original.height() * self._zoom))
         self._label_imagem.resize(largura, altura)
+        self._atualizar_rubber_band()
+
+    def _finalizar_selecao(self, ponto_final_viewport: QPoint) -> None:
+        if self._pixmap_original is None or self._ponto_inicial_selecao_viewport is None:
+            return
+
+        retangulo_viewport = QRect(self._ponto_inicial_selecao_viewport, ponto_final_viewport).normalized()
+        self._selecao_retangular = self._converter_viewport_para_imagem(retangulo_viewport)
+
+        if self._selecao_retangular.isEmpty():
+            self._selecao_retangular = None
+            self._rubber_band.hide()
+            self.selecao_alterada.emit(None)
+            self._ponto_inicial_selecao_viewport = None
+            return
+
+        self._ponto_inicial_selecao_viewport = None
+        self._atualizar_rubber_band()
+        self.selecao_alterada.emit(self._selecao_retangular)
+
+    def _converter_viewport_para_imagem(self, rect: QRect) -> QRect:
+        if self._pixmap_original is None:
+            return QRect()
+
+        offset_x = self.horizontalScrollBar().value()
+        offset_y = self.verticalScrollBar().value()
+
+        x_inicial = int((rect.x() + offset_x) / self._zoom)
+        y_inicial = int((rect.y() + offset_y) / self._zoom)
+        largura = int(rect.width() / self._zoom)
+        altura = int(rect.height() / self._zoom)
+
+        imagem_rect = QRect(x_inicial, y_inicial, largura, altura)
+        imagem_rect = imagem_rect.intersected(
+            QRect(0, 0, self._pixmap_original.width(), self._pixmap_original.height())
+        )
+        return imagem_rect
+
+    def _converter_imagem_para_viewport(self, rect: QRect) -> QRect:
+        if self._pixmap_original is None:
+            return QRect()
+
+        offset_x = self.horizontalScrollBar().value()
+        offset_y = self.verticalScrollBar().value()
+
+        x = int(round(rect.x() * self._zoom - offset_x))
+        y = int(round(rect.y() * self._zoom - offset_y))
+        largura = int(round(rect.width() * self._zoom))
+        altura = int(round(rect.height() * self._zoom))
+        return QRect(x, y, largura, altura)
+
+    def _atualizar_rubber_band(self, *args) -> None:
+        if self._selecao_retangular is None or self._pixmap_original is None:
+            self._rubber_band.hide()
+            return
+
+        rect_viewport = self._converter_imagem_para_viewport(self._selecao_retangular)
+        if rect_viewport.isEmpty():
+            self._rubber_band.hide()
+            return
+
+        self._rubber_band.setGeometry(rect_viewport)
+        self._rubber_band.show()
 
     def _limite_zoom_superior(self) -> float:
         if self._pixmap_original is None:
@@ -299,6 +413,10 @@ class VisualizadorImagem(QScrollArea):
     def _atualizar_cursor(self) -> None:
         if self._arrastando:
             self.viewport().setCursor(Qt.CursorShape.ClosedHandCursor)
+            return
+
+        if self._modo_selecao_ativo and self._pixmap_original is not None:
+            self.viewport().setCursor(Qt.CursorShape.CrossCursor)
             return
 
         if self.possui_imagem() and (self._espaco_pressionado or self._ferramenta_mao_ativa):
