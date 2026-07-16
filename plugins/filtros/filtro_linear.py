@@ -275,6 +275,9 @@ class FiltroLinear(PluginBase):
     # ------------------------------------------------------------------
 
     def processar(self, imagem: np.ndarray) -> np.ndarray:
+        if imagem is None or imagem.size == 0:
+            return imagem.copy() if imagem is not None else np.array([])
+
         kernel = self._obter_matriz_kernel()
         operacao = self._obter_operacao()
         canal_alvo = self._obter_canal()
@@ -284,20 +287,34 @@ class FiltroLinear(PluginBase):
 
         imagem_saida = imagem.copy()
 
+        # Isola o canal Alpha se a imagem for BGRA (4 canais)
+        possui_alpha = imagem.ndim == 3 and imagem.shape[2] == 4
+        if possui_alpha:
+            cor_trabalho = imagem[..., :3]
+            alpha = imagem[..., 3:]
+        else:
+            cor_trabalho = imagem
+            alpha = None
+
         if canal_alvo == "rgb":
             # Aplica nos 3 canais simultaneamente
-            imagem_filtrada = cv2.filter2D(imagem, -1, kernel)
+            imagem_filtrada = cv2.filter2D(cor_trabalho, -1, kernel)
             imagem_saida = np.clip(imagem_filtrada, 0, 255).astype(np.uint8)
         else:
             # Aplica apenas no canal selecionado
-            idx_canal = {"r": 0, "g": 1, "b": 2}[canal_alvo]
+            idx_canal = {"r": 2, "g": 1, "b": 0}[canal_alvo]
             
             # Isola o canal e aplica o filtro 2D
-            canal_isolado = imagem[..., idx_canal]
+            canal_isolado = cor_trabalho[..., idx_canal]
             canal_filtrado = cv2.filter2D(canal_isolado, -1, kernel)
             
-            # Mescla de volta preservando os limites de 8-bits
+            # Substitui o canal na imagem de trabalho aplicando saturação segura (clip)
+            imagem_saida = cor_trabalho.copy()
             imagem_saida[..., idx_canal] = np.clip(canal_filtrado, 0, 255).astype(np.uint8)
+
+        # Reconcatena o canal de opacidade (Alpha), se ele existir
+        if possui_alpha:
+            return np.concatenate((imagem_saida, alpha), axis=2)
 
         return imagem_saida
 
@@ -306,10 +323,12 @@ class FiltroLinear(PluginBase):
     # ------------------------------------------------------------------
 
     def _ao_alterar_parametros(self, estado=None) -> None:
-        imagem_processada = self.processar(self.imagem_original)
-        self.preview_requested.emit(imagem_processada)
+        if hasattr(self, "imagem_original"):
+            imagem_processada = self.processar(self.imagem_original)
+            self.preview_requested.emit(imagem_processada)
 
     def _ao_aplicar(self) -> None:
-        imagem_processada = self.processar(self.imagem_original)
-        self.apply_requested.emit(imagem_processada)
-        self.accept()
+        if hasattr(self, "imagem_original"):
+            imagem_processada = self.processar(self.imagem_original)
+            self.apply_requested.emit(imagem_processada)
+            self.accept()
