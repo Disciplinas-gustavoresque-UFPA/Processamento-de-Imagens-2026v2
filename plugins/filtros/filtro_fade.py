@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
 
 from core.plugin_base import PluginBase
 
-
 class FiltroFade(PluginBase):
 
     display_name = "Fade"
@@ -85,7 +84,7 @@ class FiltroFade(PluginBase):
         self._botao_aplicar.clicked.connect(self._ao_aplicar)
         self._botao_cancelar.clicked.connect(self.reject)
 
-        self.setMinimumWidth(390)
+        self.adjustSize(390)
 
     def _obter_intensidade(self) -> float:
         return self._slider_intensidade.value() / 100.0
