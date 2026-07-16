@@ -1,3 +1,14 @@
+"""Plugin de localização de imagens por Template Matching.
+
+O plugin permite selecionar uma imagem de referência e procurar ocorrências
+semelhantes dentro da imagem aberta. A busca é realizada em múltiplas escalas,
+permitindo localizar o objeto mesmo quando ele aparece em tamanhos diferentes.
+
+As regiões encontradas são destacadas com retângulos e seus respectivos índices
+de similaridade. O usuário pode ajustar o threshold de detecção e visualizar um
+mapa de calor com as regiões de maior correspondência.
+"""
+
 import os
 
 import cv2
@@ -18,6 +29,8 @@ from core.plugin_base import PluginBase
 
 
 class LocalizarTemplate(PluginBase):
+    """Localiza ocorrências de uma imagem de referência em múltiplas escalas."""
+
     display_name = "Localizar imagem de referência"
 
     def setup_ui(self):
@@ -35,9 +48,11 @@ class LocalizarTemplate(PluginBase):
         layout = QVBoxLayout(self)
 
         self.label_instrucao = QLabel(
-            "O mapa de calor mostra onde há maior semelhança. "
-            "Ajuste o threshold: menor encontra mais regiões; maior encontra só as mais parecidas. "
-            "O sistema procura automaticamente em vários tamanhos."
+            "Localiza, na imagem aberta, regiões semelhantes à imagem de referência "
+            "selecionada. A busca é feita automaticamente em vários tamanhos. "
+            "O threshold controla a similaridade mínima: valores menores encontram "
+            "mais regiões, enquanto valores maiores mantêm apenas as correspondências "
+            "mais fortes. O mapa de calor destaca as áreas com maior semelhança."
         )
         self.label_instrucao.setWordWrap(True)
         layout.addWidget(self.label_instrucao)
@@ -72,10 +87,6 @@ class LocalizarTemplate(PluginBase):
         layout.addWidget(self.label_resultado)
 
         linha_botoes = QHBoxLayout()
-
-        self.btn_preview = QPushButton("Pré-visualizar")
-        self.btn_preview.clicked.connect(self._atualizar_preview)
-        linha_botoes.addWidget(self.btn_preview)
 
         self.btn_aplicar = QPushButton("Aplicar")
         self.btn_aplicar.clicked.connect(self._aplicar)
