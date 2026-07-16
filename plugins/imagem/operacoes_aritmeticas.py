@@ -259,7 +259,7 @@ class OperacoesAritmeticas(PluginBase):
         if self._segunda_imagem is None:
             return imagem.copy()
 
-        segunda = cv2.resize(
+        imagem_segundaria = cv2.resize(
             self._segunda_imagem,
             (imagem.shape[1], imagem.shape[0]),
         )
