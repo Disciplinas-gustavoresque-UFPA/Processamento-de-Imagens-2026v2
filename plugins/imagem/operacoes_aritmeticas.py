@@ -271,9 +271,104 @@ class OperacoesAritmeticas(PluginBase):
         resultado = cv2.addWeighted(
             imagem,
             alpha,
-            segunda,
+            imagem_segundaria,
             beta,
             gamma,
         )
 
         return resultado
+
+    def _ao_mudar_parametros(self) -> None:
+        """
+        Objetivo:
+            Atualizar os valores exibidos na interface e gerar uma nova
+            pré-visualização da operação aritmética.
+
+        Especificidades:
+            Os sliders de alpha e beta armazenam valores inteiros entre
+            0 e 200. Esses valores são convertidos para números reais
+            dividindo-os por 100, permitindo representar valores entre
+            0.00 e 2.00.
+
+            O valor de gamma é exibido diretamente, pois representa um
+            deslocamento inteiro.
+
+            Após atualizar os rótulos, uma nova pré-visualização é
+            solicitada.
+
+        Parâmetros:
+            Nenhum.
+
+        Retorno:
+            None.
+        """
+
+        self._valor_alpha.setText(
+            f"{self._slider_alpha.value() / 100:.2f}"
+        )
+
+        self._valor_beta.setText(
+            f"{self._slider_beta.value() / 100:.2f}"
+        )
+
+        self._valor_gamma.setText(
+            str(self._slider_gamma.value())
+        )
+
+        self._emitir_preview()
+
+    def _emitir_preview(self) -> None:
+        """
+        Objetivo:
+            Gerar uma pré-visualização da imagem resultante da operação
+            aritmética.
+
+        Especificidades:
+            A pré-visualização somente é emitida quando uma segunda
+            imagem já foi carregada.
+
+            A imagem processada é enviada para a janela principal por
+            meio do sinal 'preview_requested', permitindo visualizar o
+            resultado antes da aplicação definitiva.
+
+        Parâmetros:
+            Nenhum.
+
+        Retorno:
+            None.
+        """
+
+        if self._segunda_imagem is None:
+            return
+
+        imagem_processada = self.processar(
+            self.imagem_original
+        )
+
+        self.preview_requested.emit(imagem_processada)
+
+    def _ao_aplicar(self) -> None:
+        """
+        Objetivo:
+            Confirmar e aplicar definitivamente a operação aritmética.
+
+        Especificidades:
+            Processa a imagem utilizando os parâmetros atualmente
+            definidos pelo usuário, emite o resultado para a aplicação
+            por meio do sinal 'apply_requested' e encerra a janela do
+            plugin.
+
+        Parâmetros:
+            Nenhum.
+
+        Retorno:
+            None.
+        """
+
+        imagem_processada = self.processar(
+            self.imagem_original
+        )
+
+        self.apply_requested.emit(imagem_processada)
+
+        self.accept()
