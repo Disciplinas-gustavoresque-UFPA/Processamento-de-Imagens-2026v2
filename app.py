@@ -730,6 +730,24 @@ class JanelaPrincipal(QMainWindow):
             aviso = menu_filtros.addAction("(nenhum plugin encontrado)")
             aviso.setEnabled(False)
 
+        # --- Menu Detecção ---
+        menu_deteccao = barra.addMenu("Detecção")
+        diretorio_deteccao = os.path.join(
+            _DIRETORIO_RAIZ,
+            "plugins",
+            "deteccao",
+        )
+
+        carregar_plugins_dinamicamente(
+            menu_deteccao,
+            diretorio_deteccao,
+            self,
+        )
+
+        if not _menu_tem_acao_folha(menu_deteccao):
+            aviso = menu_deteccao.addAction("(nenhum plugin encontrado)")
+            aviso.setEnabled(False)    
+
         # --- Menu Reconhecimento (leitura e identificação de padrões) ---
         menu_reconhecimento = barra.addMenu("Reconhecimento")
         diretorio_reconhecimento = os.path.join(

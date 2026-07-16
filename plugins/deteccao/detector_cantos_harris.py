@@ -1,3 +1,11 @@
+"""Plugin para detecção de cantos em imagens usando o algoritmo de Harris.
+
+O detector identifica regiões com variações significativas de intensidade em
+mais de uma direção. A interface permite configurar o limiar de detecção, o
+tamanho da vizinhança, a abertura do operador Sobel e o parâmetro de
+sensibilidade k.
+"""
+
 import cv2
 import numpy as np
 from PySide6.QtCore import Qt
@@ -16,20 +24,32 @@ from core.plugin_base import PluginBase
 
 
 class DetectorCantosHarris(PluginBase):
+    """Detecta e destaca cantos utilizando o algoritmo de Harris."""
+
     display_name = "Detector de Cantos de Harris"
 
     def setup_ui(self):
         self.setWindowTitle("Detector de Cantos de Harris")
-        self.resize(520, 340)
+        self.resize(540, 430)
 
         layout = QVBoxLayout(self)
 
-        instrucao = QLabel(
-            "Detecta cantos usando a técnica de Harris. "
-            "Ajuste o threshold: menor detecta mais cantos; maior mantém apenas os cantos mais fortes."
+        descricao = QLabel(
+            "<b>Detector de Cantos de Harris</b><br>"
+            "Identifica pontos da imagem nos quais existem variações intensas "
+            "de luminosidade em diferentes direções.<br><br>"
+            "<b>Parâmetros ajustáveis:</b><br>"
+            "• <b>Threshold:</b> controla a intensidade mínima necessária para "
+            "um ponto ser considerado canto. Valores menores detectam mais pontos.<br>"
+            "• <b>Vizinhança:</b> define o tamanho da região analisada ao redor "
+            "de cada pixel.<br>"
+            "• <b>Abertura Sobel:</b> define o tamanho do operador usado no "
+            "cálculo dos gradientes.<br>"
+            "• <b>Parâmetro k:</b> controla a sensibilidade do algoritmo de Harris.<br>"
+            "As alterações são exibidas automaticamente na pré-visualização."
         )
-        instrucao.setWordWrap(True)
-        layout.addWidget(instrucao)
+        descricao.setWordWrap(True)
+        layout.addWidget(descricao)
 
         # Threshold
         linha_threshold = QHBoxLayout()
@@ -40,7 +60,13 @@ class DetectorCantosHarris(PluginBase):
         self.slider_threshold = QSlider(Qt.Orientation.Horizontal)
         self.slider_threshold.setRange(1, 20)
         self.slider_threshold.setValue(1)
-        self.slider_threshold.valueChanged.connect(self._ao_alterar_threshold)
+        self.slider_threshold.setToolTip(
+            "Define o percentual mínimo da resposta de Harris utilizado "
+            "para considerar um ponto como canto."
+        )
+        self.slider_threshold.valueChanged.connect(
+            self._ao_alterar_threshold
+        )
         linha_threshold.addWidget(self.slider_threshold)
 
         layout.addLayout(linha_threshold)
@@ -52,6 +78,9 @@ class DetectorCantosHarris(PluginBase):
         self.spin_block = QSpinBox()
         self.spin_block.setRange(2, 15)
         self.spin_block.setValue(2)
+        self.spin_block.setToolTip(
+            "Tamanho da vizinhança analisada pelo detector de Harris."
+        )
         self.spin_block.valueChanged.connect(self._atualizar_preview)
         linha_block.addWidget(self.spin_block)
 
@@ -65,7 +94,13 @@ class DetectorCantosHarris(PluginBase):
         self.spin_ksize.setRange(3, 7)
         self.spin_ksize.setSingleStep(2)
         self.spin_ksize.setValue(3)
-        self.spin_ksize.valueChanged.connect(self._garantir_ksize_impar)
+        self.spin_ksize.setToolTip(
+            "Tamanho da abertura do operador Sobel. "
+            "O valor precisa ser positivo e ímpar."
+        )
+        self.spin_ksize.valueChanged.connect(
+            self._garantir_ksize_impar
+        )
         linha_ksize.addWidget(self.spin_ksize)
 
         layout.addLayout(linha_ksize)
@@ -77,20 +112,40 @@ class DetectorCantosHarris(PluginBase):
         self.spin_k = QDoubleSpinBox()
         self.spin_k.setRange(0.01, 0.20)
         self.spin_k.setSingleStep(0.01)
+        self.spin_k.setDecimals(2)
         self.spin_k.setValue(0.04)
+        self.spin_k.setToolTip(
+            "Parâmetro de sensibilidade do detector de Harris. "
+            "Valores comuns ficam entre 0,04 e 0,06."
+        )
         self.spin_k.valueChanged.connect(self._atualizar_preview)
         linha_k.addWidget(self.spin_k)
 
         layout.addLayout(linha_k)
 
-        self.check_supressao = QCheckBox("Reduzir pontos muito próximos")
+        self.check_supressao = QCheckBox(
+            "Reduzir pontos muito próximos"
+        )
         self.check_supressao.setChecked(True)
-        self.check_supressao.stateChanged.connect(self._atualizar_preview)
+        self.check_supressao.setToolTip(
+            "Mantém apenas o ponto mais forte em cada região detectada."
+        )
+        self.check_supressao.stateChanged.connect(
+            self._atualizar_preview
+        )
         layout.addWidget(self.check_supressao)
 
-        self.check_mapa_resposta = QCheckBox("Mostrar mapa de resposta de Harris")
+        self.check_mapa_resposta = QCheckBox(
+            "Mostrar mapa de resposta de Harris"
+        )
         self.check_mapa_resposta.setChecked(False)
-        self.check_mapa_resposta.stateChanged.connect(self._atualizar_preview)
+        self.check_mapa_resposta.setToolTip(
+            "Sobrepõe à imagem um mapa de cores com a intensidade "
+            "da resposta do detector."
+        )
+        self.check_mapa_resposta.stateChanged.connect(
+            self._atualizar_preview
+        )
         layout.addWidget(self.check_mapa_resposta)
 
         self.label_resultado = QLabel("Cantos detectados: 0")
@@ -98,10 +153,6 @@ class DetectorCantosHarris(PluginBase):
         layout.addWidget(self.label_resultado)
 
         linha_botoes = QHBoxLayout()
-
-        self.btn_preview = QPushButton("Pré-visualizar")
-        self.btn_preview.clicked.connect(self._atualizar_preview)
-        linha_botoes.addWidget(self.btn_preview)
 
         self.btn_aplicar = QPushButton("Aplicar")
         self.btn_aplicar.clicked.connect(self._aplicar)
@@ -112,7 +163,6 @@ class DetectorCantosHarris(PluginBase):
         linha_botoes.addWidget(self.btn_cancelar)
 
         layout.addLayout(linha_botoes)
-        self.setLayout(layout)
 
     def _ao_alterar_threshold(self, *_):
         valor = self.slider_threshold.value()
@@ -144,25 +194,32 @@ class DetectorCantosHarris(PluginBase):
         )
 
         resposta = cv2.dilate(resposta, None)
-
         resposta_maxima = resposta.max()
 
         if resposta_maxima <= 0:
             self.label_resultado.setText("Cantos detectados: 0")
             return saida
 
-        threshold = (self.slider_threshold.value() / 100.0) * resposta_maxima
+        threshold = (
+            self.slider_threshold.value() / 100.0
+        ) * resposta_maxima
 
         mapa_binario = resposta > threshold
 
         if self.check_supressao.isChecked():
-            pontos = self._extrair_pontos_com_supressao(resposta, mapa_binario)
+            pontos = self._extrair_pontos_com_supressao(
+                resposta,
+                mapa_binario,
+            )
         else:
             ys, xs = np.where(mapa_binario)
             pontos = list(zip(xs, ys))
 
         if self.check_mapa_resposta.isChecked():
-            saida = self._aplicar_mapa_resposta(imagem, resposta)
+            saida = self._aplicar_mapa_resposta(
+                imagem,
+                resposta,
+            )
 
         for x, y in pontos:
             cv2.circle(
@@ -180,7 +237,11 @@ class DetectorCantosHarris(PluginBase):
 
         return saida
 
-    def _extrair_pontos_com_supressao(self, resposta, mapa_binario):
+    def _extrair_pontos_com_supressao(
+        self,
+        resposta,
+        mapa_binario,
+    ):
         resposta_normalizada = cv2.normalize(
             resposta,
             None,
@@ -189,9 +250,11 @@ class DetectorCantosHarris(PluginBase):
             cv2.NORM_MINMAX,
         ).astype(np.uint8)
 
-        componentes, labels, stats, centroids = cv2.connectedComponentsWithStats(
-            mapa_binario.astype(np.uint8),
-            connectivity=8,
+        componentes, labels, stats, _ = (
+            cv2.connectedComponentsWithStats(
+                mapa_binario.astype(np.uint8),
+                connectivity=8,
+            )
         )
 
         pontos = []
@@ -212,7 +275,6 @@ class DetectorCantosHarris(PluginBase):
 
             area = stats[rotulo, cv2.CC_STAT_AREA]
 
-            # Evita ruídos muito grandes ou componentes estranhos.
             if area <= 0:
                 continue
 
@@ -220,7 +282,11 @@ class DetectorCantosHarris(PluginBase):
 
         return pontos
 
-    def _aplicar_mapa_resposta(self, imagem_rgb, resposta):
+    def _aplicar_mapa_resposta(
+        self,
+        imagem_rgb,
+        resposta,
+    ):
         resposta_norm = cv2.normalize(
             resposta,
             None,
@@ -250,10 +316,14 @@ class DetectorCantosHarris(PluginBase):
         return imagem_com_mapa
 
     def _atualizar_preview(self, *_):
-        imagem_processada = self.processar(self.imagem_original)
+        imagem_processada = self.processar(
+            self.imagem_original
+        )
         self.preview_requested.emit(imagem_processada)
 
     def _aplicar(self):
-        imagem_processada = self.processar(self.imagem_original)
+        imagem_processada = self.processar(
+            self.imagem_original
+        )
         self.apply_requested.emit(imagem_processada)
         self.accept()
