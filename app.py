@@ -729,7 +729,7 @@ class JanelaPrincipal(QMainWindow):
             aviso = menu_pixels.addAction("(nenhum plugin encontrado)")
             aviso.setEnabled(False)
 
-        # --- Menu Filtros (operações regionais) ---
+        # --- Menu Filtros (operações regionais)  ---
         menu_filtros = barra.addMenu("Filtros")
         diretorio_filtros = os.path.join(_DIRETORIO_RAIZ, "plugins", "filtros")
         carregar_plugins_dinamicamente(menu_filtros, diretorio_filtros, self)
