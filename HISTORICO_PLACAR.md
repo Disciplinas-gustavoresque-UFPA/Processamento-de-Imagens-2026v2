@@ -185,3 +185,33 @@ Registro contínuo das métricas de engajamento, pontuações e badges atribuíd
 1. **@lorenarss** - 1 badges
 2. **@alfa-m** - 1 badges
 
+## 📅 Semana de 21/07/2026
+
+### 📊 Métricas de Engajamento da Semana
+| Aluno | Issues Abertas | PRs Abertos | Comentários (Próprios) | Comentários (Outros) | Code Reviews |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **@alfa-m** | 0 | 0 | 1 | 4 | 3 |
+| **@jonasbraganca** | 0 | 3 | 0 | 0 | 1 |
+| **@fenalk** | 0 | 1 | 0 | 0 | 2 |
+| **@jmurillosant** | 0 | 2 | 0 | 0 | 0 |
+| **@IcsPingu** | 0 | 2 | 0 | 0 | 0 |
+| **@gguisandim** | 0 | 0 | 2 | 0 | 0 |
+| **@antenoraires** | 0 | 0 | 2 | 0 | 0 |
+| **@Dracpyto** | 0 | 1 | 0 | 0 | 0 |
+| **@hug0mgs** | 0 | 1 | 0 | 0 | 0 |
+| **@cyberchristian92** | 0 | 0 | 0 | 1 | 0 |
+
+---
+
+### 🏆 Badges Conquistadas
+#### ⌨️ Jack Bauer do Código
+1. **@IcsPingu** - 1022 linhas
+2. **@jonasbraganca** - 838 linhas
+3. **@gguisandim** - 820 linhas
+4. **@hug0mgs** - 750 linhas
+5. **@thiagorm1** - 637 linhas
+6. **@fenalk** - 374 linhas
+7. **@jmurillosant** - 242 linhas
+8. **@Motaromc** - 241 linhas
+9. **@alfa-m** - 58 linhas
+
