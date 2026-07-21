@@ -39,20 +39,20 @@ As suas contribuições e Pull Requests (PRs) não valem apenas nota, mas també
 
 ## 🏆 Hall da Fama - Placar Semanal da Turma
 
-> 🤖 *Placar atualizado automaticamente em: 29/06/2026 00:19*
+> 🤖 *Placar atualizado automaticamente em: 21/07/2026 00:14*
 
 ### ⌨️ Jack Bauer do Código
 *Quem mais codificou na semana (Volume total de linhas mescladas)*
 
 ![Jack Bauer](/.github/images/memes/image_5.png)
 
-🥇 **@Motaromc** (2171 linhas mescladas)
+🥇 **@Motaromc** (2412 linhas mescladas)
 
 <details><summary>Ver Top 3 completo</summary>
 
-🥇 @Motaromc (2171)
+🥇 @Motaromc (2412)
 🥈 @sayydaviid (1942)
-🥉 @alfa-m (1219)
+🥉 @alfa-m (1277)
 
 </details>
 
